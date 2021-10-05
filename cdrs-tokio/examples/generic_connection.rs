@@ -31,7 +31,7 @@ use cdrs_tokio::frame::Serialize;
 use cdrs_tokio::retry::ConstantReconnectionPolicy;
 use maplit::hashmap;
 
-type CurrentSession = Session<TransportTcp, TcpConnectionManager, RoundRobin<TcpConnectionManager>>;
+type CurrentSession = Session<TransportTcp, TcpConnectionManager, RoundRobin>;
 
 /// Implements a cluster configuration where the addresses to
 /// connect to are different from the ones configured by replacing

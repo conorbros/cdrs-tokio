@@ -13,7 +13,7 @@ use cdrs_tokio::types::from_cdrs::FromCdrsByName;
 use cdrs_tokio::types::prelude::*;
 use cdrs_tokio_helpers_derive::*;
 
-type CurrentSession = Session<TransportTcp, TcpConnectionManager, RoundRobin<TcpConnectionManager>>;
+type CurrentSession = Session<TransportTcp, TcpConnectionManager, RoundRobin>;
 
 #[tokio::main]
 async fn main() {

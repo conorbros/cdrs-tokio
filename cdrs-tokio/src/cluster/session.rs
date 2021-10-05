@@ -12,6 +12,7 @@ use crate::authenticators::SaslAuthenticatorProvider;
 use crate::cluster::connection_manager::ConnectionManager;
 #[cfg(feature = "rust-tls")]
 use crate::cluster::rustls_connection_manager::RustlsConnectionManager;
+use crate::cluster::session_data::SessionData;
 use crate::cluster::tcp_connection_manager::TcpConnectionManager;
 #[cfg(feature = "rust-tls")]
 use crate::cluster::ClusterRustlsConfig;
@@ -36,6 +37,7 @@ use crate::retry::{
 #[cfg(feature = "rust-tls")]
 use crate::transport::TransportRustls;
 use crate::transport::{CdrsTransport, TransportTcp};
+use arc_swap::ArcSwap;
 
 static NEVER_RECONNECTION_POLICY: NeverReconnectionPolicy = NeverReconnectionPolicy;
 
@@ -48,6 +50,7 @@ pub struct Session<
     LB: LoadBalancingStrategy<CM> + Send + Sync,
 > {
     load_balancing: LB,
+    session_data: Arc<ArcSwap<SessionData<CM>>>,
     compression: Compression,
     transport_buffer_size: usize,
     tcp_nodelay: bool,
@@ -73,8 +76,13 @@ impl<
         SessionPager::new(self, page_size)
     }
 
+    fn get_data(&self) -> Arc<SessionData<CM>> {
+        self.session_data.load_full()
+    }
+
     fn new(
         load_balancing: LB,
+        session_data: Arc<ArcSwap<SessionData<CM>>>,
         compression: Compression,
         transport_buffer_size: usize,
         tcp_nodelay: bool,
@@ -84,6 +92,7 @@ impl<
         Session {
             load_balancing,
             compression,
+            session_data,
             transport_buffer_size,
             tcp_nodelay,
             retry_policy,
@@ -105,9 +114,11 @@ impl<
         // when using a load balancer with > 1 node, don't use reconnection policy for a given node,
         // but jump to the next one
 
+        let data = self.get_data();
+
         let connection_manager = {
-            if self.load_balancing.size() < 2 {
-                self.load_balancing.next()
+            if self.load_balancing.size(&data) < 2 {
+                self.load_balancing.next(&data)
             } else {
                 None
             }
@@ -125,7 +136,7 @@ impl<
         }
 
         loop {
-            let connection_manager = self.load_balancing.next()?;
+            let connection_manager = self.load_balancing.next(&data)?;
             let connection = connection_manager
                 .connection(&NEVER_RECONNECTION_POLICY)
                 .await;
@@ -135,14 +146,8 @@ impl<
         }
     }
 
-    async fn node_connection(&self, node: &SocketAddr) -> Option<error::Result<Arc<T>>> {
-        let connection_manager = self.load_balancing.find(|cm| cm.addr() == *node)?;
-
-        Some(
-            connection_manager
-                .connection(self.reconnection_policy.deref())
-                .await,
-        )
+    async fn node_connection(&self, _node: &SocketAddr) -> Option<error::Result<Arc<T>>> {
+        todo!();
     }
 }
 
@@ -223,7 +228,7 @@ pub struct ReconnectionPolicyWrapper(pub Box<dyn ReconnectionPolicy + Send + Syn
 pub async fn connect_generic_static<T, C, A, CM, LB>(
     config: &C,
     initial_nodes: &[A],
-    mut load_balancing: LB,
+    load_balancing: LB,
     compression: Compression,
     retry_policy: RetryPolicyWrapper,
     reconnection_policy: ReconnectionPolicyWrapper,
@@ -242,11 +247,14 @@ where
         nodes.push(Arc::new(connection_manager));
     }
 
-    load_balancing.init(nodes);
+    //load_balancing.init(nodes);
+
+    let session_data = Arc::new(ArcSwap::from(Arc::new(SessionData::new(nodes))));
 
     Ok(Session {
         load_balancing,
         compression,
+        session_data,
         transport_buffer_size: DEFAULT_TRANSPORT_BUFFER_SIZE,
         tcp_nodelay: true,
         retry_policy: retry_policy.0,
@@ -628,7 +636,7 @@ impl<LB: LoadBalancingStrategy<TcpConnectionManager> + Send + Sync>
         self
     }
 
-    fn build(mut self) -> Session<TransportTcp, TcpConnectionManager, LB> {
+    fn build(self) -> Session<TransportTcp, TcpConnectionManager, LB> {
         let keyspace_holder = Arc::new(KeyspaceHolder::default());
         let mut nodes = Vec::with_capacity(self.node_configs.0.len());
 
@@ -644,10 +652,13 @@ impl<LB: LoadBalancingStrategy<TcpConnectionManager> + Send + Sync>
             nodes.push(Arc::new(connection_manager));
         }
 
-        self.config.load_balancing.init(nodes);
+        let session_data = Arc::new(ArcSwap::from(Arc::new(
+            SessionData::<TcpConnectionManager>::new(nodes),
+        )));
 
         Session::new(
             self.config.load_balancing,
+            session_data,
             self.config.compression,
             self.config.transport_buffer_size,
             self.config.tcp_nodelay,

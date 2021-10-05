@@ -12,6 +12,7 @@ mod pager;
 #[cfg(feature = "rust-tls")]
 mod rustls_connection_manager;
 pub mod session;
+pub mod session_data;
 mod tcp_connection_manager;
 
 #[cfg(feature = "rust-tls")]
@@ -23,6 +24,8 @@ pub use crate::cluster::keyspace_holder::KeyspaceHolder;
 pub use crate::cluster::node_address::NodeAddress;
 pub use crate::cluster::pager::{ExecPager, PagerState, QueryPager, SessionPager};
 pub use crate::cluster::session::connect_generic_static;
+
+pub use crate::cluster::session_data::SessionData;
 
 pub use crate::cluster::connection_manager::{startup, ConnectionManager};
 #[cfg(feature = "rust-tls")]
