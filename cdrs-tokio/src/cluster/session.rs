@@ -226,54 +226,6 @@ pub struct RetryPolicyWrapper(pub Box<dyn RetryPolicy + Send + Sync>);
 #[repr(transparent)]
 pub struct ReconnectionPolicyWrapper(pub Box<dyn ReconnectionPolicy + Send + Sync>);
 
-/// This function uses a user-supplied connection configuration to initialize all the
-/// connections in the session. It can be used to supply your own transport and load
-/// balancing mechanisms in order to support unusual node discovery mechanisms
-/// or configuration needs.
-///
-/// The config object supplied differs from the ClusterTcpConfig and ClusterRustlsConfig
-/// objects in that it is not expected to include an address. Instead the same configuration
-/// will be applied to all connections across the cluster.
-pub async fn connect_generic_static<T, C, A, CM, LB>(
-    config: &C,
-    initial_nodes: &[A],
-    load_balancing: LB,
-    compression: Compression,
-    retry_policy: RetryPolicyWrapper,
-    reconnection_policy: ReconnectionPolicyWrapper,
-) -> error::Result<Session<T, CM, LB>>
-where
-    A: Clone,
-    T: CdrsTransport + 'static,
-    CM: ConnectionManager<T>,
-    C: GenericClusterConfig<T, CM, Address = A>,
-    LB: LoadBalancingStrategy<CM> + Sized + Send + Sync,
-{
-    todo!();
-    // let mut nodes = Vec::with_capacity(initial_nodes.len());
-
-    // for node in initial_nodes {
-    //     let connection_manager = config.create_manager(node.clone()).await?;
-    //     nodes.push(Arc::new(connection_manager));
-    // }
-
-    // //load_balancing.init(nodes);
-
-    // let session_data = Arc::new(ArcSwap::from(Arc::new(SessionData::new(nodes))));
-
-    // Ok(Session {
-    //     load_balancing,
-    //     compression,
-    //     session_data,
-    //     transport_buffer_size: DEFAULT_TRANSPORT_BUFFER_SIZE,
-    //     tcp_nodelay: true,
-    //     retry_policy: retry_policy.0,
-    //     reconnection_policy: reconnection_policy.0,
-    //     _transport: Default::default(),
-    //     _connection_manager: Default::default(),
-    // })
-}
-
 /// Creates new session that will perform queries without any compression. `Compression` type
 /// can be changed at any time.
 /// As a parameter it takes:
@@ -745,31 +697,41 @@ impl<LB: LoadBalancingStrategy<RustlsConnectionManager> + Send + Sync>
     }
 
     fn build(mut self) -> Session<TransportRustls, RustlsConnectionManager, LB> {
-        todo!();
-        // let keyspace_holder = Arc::new(KeyspaceHolder::default());
-        // let mut nodes = Vec::with_capacity(self.node_configs.0.len());
+        let keyspace_holder = Arc::new(KeyspaceHolder::default());
+        let mut nodes = Vec::with_capacity(self.node_configs.0.len());
+        let mut known_peers = HashMap::new();
 
-        // for node_config in self.node_configs.0 {
-        //     let connection_manager = RustlsConnectionManager::new(
-        //         node_config,
-        //         keyspace_holder.clone(),
-        //         self.config.compression,
-        //         self.config.transport_buffer_size,
-        //         self.config.tcp_nodelay,
-        //         None,
-        //     );
-        //     nodes.push(Arc::new(connection_manager));
-        // }
+        for node_config in self.node_configs.0 {
+            let connection_manager = RustlsConnectionManager::new(
+                node_config,
+                keyspace_holder.clone(),
+                self.config.compression,
+                self.config.transport_buffer_size,
+                self.config.tcp_nodelay,
+                None,
+            );
+            nodes.push(Arc::new(connection_manager));
+        }
 
-        // self.config.load_balancing.init(nodes);
+        let session_data = Arc::new(ArcSwap::from(Arc::new(SessionData::<
+            RustlsConnectionManager,
+        >::new(nodes, known_peers))));
+        let (refresh_sender, refresh_receiver) = tokio::sync::mpsc::channel::<RefreshRequest>(32);
+        let worker = SessionWorker::new(session_data.clone(), refresh_receiver);
 
-        // Session::new(
-        //     self.config.load_balancing,
-        //     self.config.compression,
-        //     self.config.transport_buffer_size,
-        //     self.config.tcp_nodelay,
-        //     self.config.retry_policy,
-        //     self.config.reconnection_policy,
-        // )
+        let (fut, worker_handle) = worker.work().remote_handle();
+        tokio::spawn(fut);
+
+        Session::new(
+            self.config.load_balancing,
+            session_data,
+            self.config.compression,
+            self.config.transport_buffer_size,
+            self.config.tcp_nodelay,
+            worker_handle,
+            refresh_sender,
+            self.config.retry_policy,
+            self.config.reconnection_policy,
+        )
     }
 }

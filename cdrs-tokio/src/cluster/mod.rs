@@ -24,7 +24,6 @@ pub use crate::cluster::config_tcp::{ClusterTcpConfig, NodeTcpConfig, NodeTcpCon
 pub use crate::cluster::keyspace_holder::KeyspaceHolder;
 pub use crate::cluster::node_address::NodeAddress;
 pub use crate::cluster::pager::{ExecPager, PagerState, QueryPager, SessionPager};
-pub use crate::cluster::session::connect_generic_static;
 
 pub use crate::cluster::session_data::SessionData;
 
