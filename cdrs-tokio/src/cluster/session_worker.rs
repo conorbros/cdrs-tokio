@@ -1,45 +1,34 @@
 use crate::cluster::connection_manager::ConnectionManager;
-use crate::load_balancing::LoadBalancingStrategy;
-use crate::transport::{CdrsTransport, TransportTcp};
+use crate::cluster::session_data::SessionData;
+use crate::transport::CdrsTransport;
 use anyhow::Result;
+use arc_swap::ArcSwap;
+use std::sync::Arc;
 
 pub struct RefreshRequest {
     response_chan: tokio::sync::oneshot::Sender<Result<()>>,
 }
 
-pub struct SessionWorker<
-    T: CdrsTransport + Send + Sync + 'static,
-    CM: ConnectionManager<T> + Send,
-    LB: LoadBalancingStrategy<CM> + Send + Sync,
-> {
-    load_balancing: std::sync::Arc<LB>,
+pub struct SessionWorker<T> {
+    session_data: Arc<ArcSwap<SessionData<T>>>,
     refresh_channel: tokio::sync::mpsc::Receiver<RefreshRequest>,
-    _transport: std::marker::PhantomData<T>,
-    _connection_manager: std::marker::PhantomData<CM>,
 }
 
-impl<
-        T: CdrsTransport + Send + Sync + 'static,
-        CM: ConnectionManager<T> + Send,
-        LB: LoadBalancingStrategy<CM> + Send + Sync,
-    > SessionWorker<T, CM, LB>
-{
+impl<T> SessionWorker<T> {
     pub fn new(
-        load_balancing: std::sync::Arc<LB>,
+        session_data: Arc<ArcSwap<SessionData<T>>>,
         refresh_channel: tokio::sync::mpsc::Receiver<RefreshRequest>,
     ) -> Self {
         Self {
-            load_balancing,
+            session_data,
             refresh_channel,
-            _connection_manager: Default::default(),
-            _transport: Default::default(),
         }
     }
 
     pub async fn work(mut self) {
         use tokio::time::{Duration, Instant};
 
-        let refresh_duration = Duration::from_secs(60); // Refresh topology every 60 seconds
+        let refresh_duration = Duration::from_secs(5); // Refresh topology every 60 seconds
         let mut last_refresh_time = Instant::now();
 
         loop {

@@ -3,16 +3,17 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 #[cfg(feature = "rust-tls")]
-mod config_rustls;
-mod config_tcp;
-mod connection_manager;
-mod keyspace_holder;
-mod node_address;
-mod pager;
+pub mod config_rustls;
+pub mod config_tcp;
+pub mod connection_manager;
+pub mod keyspace_holder;
+pub mod node_address;
+pub mod pager;
 #[cfg(feature = "rust-tls")]
 mod rustls_connection_manager;
 pub mod session;
 pub mod session_data;
+pub mod session_worker;
 mod tcp_connection_manager;
 
 #[cfg(feature = "rust-tls")]

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 #[cfg(feature = "rust-tls")]
 use std::net;
@@ -13,6 +14,7 @@ use crate::cluster::connection_manager::ConnectionManager;
 #[cfg(feature = "rust-tls")]
 use crate::cluster::rustls_connection_manager::RustlsConnectionManager;
 use crate::cluster::session_data::SessionData;
+use crate::cluster::session_worker::{RefreshRequest, SessionWorker};
 use crate::cluster::tcp_connection_manager::TcpConnectionManager;
 #[cfg(feature = "rust-tls")]
 use crate::cluster::ClusterRustlsConfig;
@@ -38,6 +40,7 @@ use crate::retry::{
 use crate::transport::TransportRustls;
 use crate::transport::{CdrsTransport, TransportTcp};
 use arc_swap::ArcSwap;
+use futures::future::{FutureExt, RemoteHandle};
 
 static NEVER_RECONNECTION_POLICY: NeverReconnectionPolicy = NeverReconnectionPolicy;
 
@@ -56,6 +59,8 @@ pub struct Session<
     tcp_nodelay: bool,
     retry_policy: Box<dyn RetryPolicy + Send + Sync>,
     reconnection_policy: Box<dyn ReconnectionPolicy + Send + Sync>,
+    refresh_channel: tokio::sync::mpsc::Sender<RefreshRequest>,
+    _worker_handle: RemoteHandle<()>,
     _transport: PhantomData<T>,
     _connection_manager: PhantomData<CM>,
 }
@@ -63,7 +68,7 @@ pub struct Session<
 impl<
         'a,
         T: CdrsTransport + Send + Sync + 'static,
-        CM: ConnectionManager<T>,
+        CM: ConnectionManager<T> + Send + Sync,
         LB: LoadBalancingStrategy<CM> + Send + Sync,
     > Session<T, CM, LB>
 {
@@ -86,6 +91,8 @@ impl<
         compression: Compression,
         transport_buffer_size: usize,
         tcp_nodelay: bool,
+        worker_handle: RemoteHandle<()>,
+        refresh_channel: tokio::sync::mpsc::Sender<RefreshRequest>,
         retry_policy: Box<dyn RetryPolicy + Send + Sync>,
         reconnection_policy: Box<dyn ReconnectionPolicy + Send + Sync>,
     ) -> Self {
@@ -96,6 +103,8 @@ impl<
             transport_buffer_size,
             tcp_nodelay,
             retry_policy,
+            refresh_channel,
+            _worker_handle: worker_handle,
             reconnection_policy,
             _transport: Default::default(),
             _connection_manager: Default::default(),
@@ -240,28 +249,29 @@ where
     C: GenericClusterConfig<T, CM, Address = A>,
     LB: LoadBalancingStrategy<CM> + Sized + Send + Sync,
 {
-    let mut nodes = Vec::with_capacity(initial_nodes.len());
+    todo!();
+    // let mut nodes = Vec::with_capacity(initial_nodes.len());
 
-    for node in initial_nodes {
-        let connection_manager = config.create_manager(node.clone()).await?;
-        nodes.push(Arc::new(connection_manager));
-    }
+    // for node in initial_nodes {
+    //     let connection_manager = config.create_manager(node.clone()).await?;
+    //     nodes.push(Arc::new(connection_manager));
+    // }
 
-    //load_balancing.init(nodes);
+    // //load_balancing.init(nodes);
 
-    let session_data = Arc::new(ArcSwap::from(Arc::new(SessionData::new(nodes))));
+    // let session_data = Arc::new(ArcSwap::from(Arc::new(SessionData::new(nodes))));
 
-    Ok(Session {
-        load_balancing,
-        compression,
-        session_data,
-        transport_buffer_size: DEFAULT_TRANSPORT_BUFFER_SIZE,
-        tcp_nodelay: true,
-        retry_policy: retry_policy.0,
-        reconnection_policy: reconnection_policy.0,
-        _transport: Default::default(),
-        _connection_manager: Default::default(),
-    })
+    // Ok(Session {
+    //     load_balancing,
+    //     compression,
+    //     session_data,
+    //     transport_buffer_size: DEFAULT_TRANSPORT_BUFFER_SIZE,
+    //     tcp_nodelay: true,
+    //     retry_policy: retry_policy.0,
+    //     reconnection_policy: reconnection_policy.0,
+    //     _transport: Default::default(),
+    //     _connection_manager: Default::default(),
+    // })
 }
 
 /// Creates new session that will perform queries without any compression. `Compression` type
@@ -639,22 +649,29 @@ impl<LB: LoadBalancingStrategy<TcpConnectionManager> + Send + Sync>
     fn build(self) -> Session<TransportTcp, TcpConnectionManager, LB> {
         let keyspace_holder = Arc::new(KeyspaceHolder::default());
         let mut nodes = Vec::with_capacity(self.node_configs.0.len());
+        let mut known_peers = HashMap::new();
 
         for node_config in self.node_configs.0 {
             let connection_manager = TcpConnectionManager::new(
-                node_config,
+                node_config.clone(),
                 keyspace_holder.clone(),
                 self.config.compression,
                 self.config.transport_buffer_size,
                 self.config.tcp_nodelay,
                 None,
             );
-            nodes.push(Arc::new(connection_manager));
+            let new_node = Arc::new(connection_manager);
+            nodes.push(new_node.clone());
         }
 
         let session_data = Arc::new(ArcSwap::from(Arc::new(
-            SessionData::<TcpConnectionManager>::new(nodes),
+            SessionData::<TcpConnectionManager>::new(nodes, known_peers),
         )));
+        let (refresh_sender, refresh_receiver) = tokio::sync::mpsc::channel::<RefreshRequest>(32);
+        let worker = SessionWorker::new(session_data.clone(), refresh_receiver);
+
+        let (fut, worker_handle) = worker.work().remote_handle();
+        tokio::spawn(fut);
 
         Session::new(
             self.config.load_balancing,
@@ -662,6 +679,8 @@ impl<LB: LoadBalancingStrategy<TcpConnectionManager> + Send + Sync>
             self.config.compression,
             self.config.transport_buffer_size,
             self.config.tcp_nodelay,
+            worker_handle,
+            refresh_sender,
             self.config.retry_policy,
             self.config.reconnection_policy,
         )
@@ -726,30 +745,31 @@ impl<LB: LoadBalancingStrategy<RustlsConnectionManager> + Send + Sync>
     }
 
     fn build(mut self) -> Session<TransportRustls, RustlsConnectionManager, LB> {
-        let keyspace_holder = Arc::new(KeyspaceHolder::default());
-        let mut nodes = Vec::with_capacity(self.node_configs.0.len());
+        todo!();
+        // let keyspace_holder = Arc::new(KeyspaceHolder::default());
+        // let mut nodes = Vec::with_capacity(self.node_configs.0.len());
 
-        for node_config in self.node_configs.0 {
-            let connection_manager = RustlsConnectionManager::new(
-                node_config,
-                keyspace_holder.clone(),
-                self.config.compression,
-                self.config.transport_buffer_size,
-                self.config.tcp_nodelay,
-                None,
-            );
-            nodes.push(Arc::new(connection_manager));
-        }
+        // for node_config in self.node_configs.0 {
+        //     let connection_manager = RustlsConnectionManager::new(
+        //         node_config,
+        //         keyspace_holder.clone(),
+        //         self.config.compression,
+        //         self.config.transport_buffer_size,
+        //         self.config.tcp_nodelay,
+        //         None,
+        //     );
+        //     nodes.push(Arc::new(connection_manager));
+        // }
 
-        self.config.load_balancing.init(nodes);
+        // self.config.load_balancing.init(nodes);
 
-        Session::new(
-            self.config.load_balancing,
-            self.config.compression,
-            self.config.transport_buffer_size,
-            self.config.tcp_nodelay,
-            self.config.retry_policy,
-            self.config.reconnection_policy,
-        )
+        // Session::new(
+        //     self.config.load_balancing,
+        //     self.config.compression,
+        //     self.config.transport_buffer_size,
+        //     self.config.tcp_nodelay,
+        //     self.config.retry_policy,
+        //     self.config.reconnection_policy,
+        // )
     }
 }
