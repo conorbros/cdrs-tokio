@@ -1,6 +1,4 @@
-use crate::cluster::connection_manager::ConnectionManager;
 use crate::cluster::session_data::SessionData;
-use crate::transport::CdrsTransport;
 use anyhow::Result;
 use arc_swap::ArcSwap;
 use std::sync::Arc;

@@ -2,9 +2,6 @@ use async_trait::async_trait;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-#[cfg(feature = "rust-tls")]
-pub mod config_rustls;
-pub mod config_tcp;
 pub mod connection_manager;
 pub mod keyspace_holder;
 pub mod node_address;
@@ -16,11 +13,6 @@ pub mod session_data;
 pub mod session_worker;
 mod tcp_connection_manager;
 
-#[cfg(feature = "rust-tls")]
-pub use crate::cluster::config_rustls::{
-    ClusterRustlsConfig, NodeRustlsConfig, NodeRustlsConfigBuilder,
-};
-pub use crate::cluster::config_tcp::{ClusterTcpConfig, NodeTcpConfig, NodeTcpConfigBuilder};
 pub use crate::cluster::keyspace_holder::KeyspaceHolder;
 pub use crate::cluster::node_address::NodeAddress;
 pub use crate::cluster::pager::{ExecPager, PagerState, QueryPager, SessionPager};

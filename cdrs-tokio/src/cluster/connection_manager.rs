@@ -11,6 +11,7 @@ use crate::frame::frame_response::ResponseBody;
 use crate::frame::{Frame, Opcode};
 use crate::retry::ReconnectionPolicy;
 use crate::transport::CdrsTransport;
+use tokio::sync::mpsc::Sender;
 
 pub type ThreadSafeReconnectionPolicy = dyn ReconnectionPolicy + Send + Sync;
 
@@ -27,6 +28,17 @@ pub trait ConnectionManager<T: CdrsTransport> {
 
     // Returns associated address.
     fn addr(&self) -> SocketAddr;
+}
+
+pub trait ConnectionConfig<T: CdrsTransport, C: ConnectionManager<T>> {
+    fn new_connection_manager(self, addr: SocketAddr) -> C;
+
+    fn new_connection_manager_with_auth_and_event(
+        self,
+        addr: SocketAddr,
+        authenticator_provider: Arc<dyn SaslAuthenticatorProvider + Send + Sync>,
+        event_handler: Option<Sender<Frame>>,
+    ) -> C;
 }
 
 /// Establishes Cassandra connection with given authentication, last used keyspace and compression.

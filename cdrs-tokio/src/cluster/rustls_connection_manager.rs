@@ -15,13 +15,44 @@ use crate::error::Result;
 use crate::frame::Frame;
 use crate::transport::{CdrsTransport, TransportRustls};
 
+/// Single node TLS connection config.
+#[derive(Clone)]
+pub struct NodeRustlsConfig {
+    pub dns_name: webpki::DNSName,
+    pub authenticator_provider: Arc<dyn SaslAuthenticatorProvider + Send + Sync>,
+    pub tls_config: Arc<rustls::ClientConfig>,
+    pub keyspace_holder: Arc<KeyspaceHolder>,
+    pub compression: Compression,
+    pub buffer_size: usize,
+    pub tcp_nodelay: bool,
+    pub event_handler: Option<Sender<Frame>>,
+}
+
+impl ConnectionConfig<TransportRustls, RustlsConnectionManager> for NodeTcpConfig {
+    fn new_connection_manager(self, addr: SocketAddr) -> RustlsConnectionManager {
+        RustlsConnectionManager::new(addr, self.clone())
+    }
+
+    fn new_connection_manager_with_auth_and_event(
+        self,
+        addr: SocketAddr,
+        authenticator_provider: Arc<dyn SaslAuthenticatorProvider + Send + Sync>,
+        event_handler: Option<Sender<Frame>>,
+    ) -> RustlsConnectionManager {
+        RustlsConnectionManager::new(
+            addr,
+            NodeRustlsConfig {
+                authenticator_provider,
+                event_handler,
+                ..self.clone()
+            },
+        )
+    }
+}
+
 pub struct RustlsConnectionManager {
+    addr: SocketAddr,
     config: NodeRustlsConfig,
-    keyspace_holder: Arc<KeyspaceHolder>,
-    compression: Compression,
-    buffer_size: usize,
-    tcp_nodelay: bool,
-    event_handler: Option<Sender<Frame>>,
     connection: RwLock<Option<Arc<TransportRustls>>>,
 }
 
@@ -73,32 +104,20 @@ impl ConnectionManager<TransportRustls> for RustlsConnectionManager {
 }
 
 impl RustlsConnectionManager {
-    pub fn new(
-        config: NodeRustlsConfig,
-        keyspace_holder: Arc<KeyspaceHolder>,
-        compression: Compression,
-        buffer_size: usize,
-        tcp_nodelay: bool,
-        event_handler: Option<Sender<Frame>>,
-    ) -> Self {
+    pub fn new(addr: SocketAddr, config: NodeRustlsConfig) -> Self {
         RustlsConnectionManager {
             config,
-            keyspace_holder,
-            compression,
-            buffer_size,
-            tcp_nodelay,
-            event_handler,
             connection: Default::default(),
         }
     }
 
     async fn establish_connection(&self) -> Result<TransportRustls> {
         let transport = TransportRustls::new(
-            self.config.addr,
+            self.addr,
             self.config.dns_name.clone(),
             self.config.config.clone(),
-            self.keyspace_holder.clone(),
-            self.event_handler.clone(),
+            self.config.keyspace_holder.clone(),
+            self.config.event_handler.clone(),
             self.compression,
             self.buffer_size,
             self.tcp_nodelay,

@@ -1,3 +1,12 @@
+use crate::authenticators::SaslAuthenticatorProvider;
+use crate::cluster::connection_manager::{
+    startup, ConnectionConfig, ConnectionManager, ThreadSafeReconnectionPolicy,
+};
+use crate::cluster::KeyspaceHolder;
+use crate::compression::Compression;
+use crate::error::Result;
+use crate::frame::Frame;
+use crate::transport::{CdrsTransport, TransportTcp};
 use async_trait::async_trait;
 use std::net::SocketAddr;
 use std::ops::Deref;
@@ -6,22 +15,43 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
-use crate::cluster::connection_manager::{
-    startup, ConnectionManager, ThreadSafeReconnectionPolicy,
-};
-use crate::cluster::{KeyspaceHolder, NodeTcpConfig};
-use crate::compression::Compression;
-use crate::error::Result;
-use crate::frame::Frame;
-use crate::transport::{CdrsTransport, TransportTcp};
+/// Single node TCP connection config.
+#[derive(Clone)]
+pub struct NodeTcpConfig {
+    pub authenticator_provider: Arc<dyn SaslAuthenticatorProvider + Send + Sync>,
+    pub keyspace_holder: Arc<KeyspaceHolder>,
+    pub compression: Compression,
+    pub buffer_size: usize,
+    pub tcp_nodelay: bool,
+    pub event_handler: Option<Sender<Frame>>,
+}
+
+#[async_trait]
+impl ConnectionConfig<TransportTcp, TcpConnectionManager> for NodeTcpConfig {
+    fn new_connection_manager(self, addr: SocketAddr) -> TcpConnectionManager {
+        TcpConnectionManager::new(addr, self.clone())
+    }
+
+    fn new_connection_manager_with_auth_and_event(
+        self,
+        addr: SocketAddr,
+        authenticator_provider: Arc<dyn SaslAuthenticatorProvider + Send + Sync>,
+        event_handler: Option<Sender<Frame>>,
+    ) -> TcpConnectionManager {
+        TcpConnectionManager::new(
+            addr,
+            NodeTcpConfig {
+                authenticator_provider,
+                event_handler,
+                ..self.clone()
+            },
+        )
+    }
+}
 
 pub struct TcpConnectionManager {
+    addr: SocketAddr,
     config: NodeTcpConfig,
-    keyspace_holder: Arc<KeyspaceHolder>,
-    compression: Compression,
-    buffer_size: usize,
-    tcp_nodelay: bool,
-    event_handler: Option<Sender<Frame>>,
     connection: RwLock<Option<Arc<TransportTcp>>>,
 }
 
@@ -68,46 +98,35 @@ impl ConnectionManager<TransportTcp> for TcpConnectionManager {
     }
 
     fn addr(&self) -> SocketAddr {
-        self.config.addr
+        self.addr
     }
 }
 
 impl TcpConnectionManager {
-    pub fn new(
-        config: NodeTcpConfig,
-        keyspace_holder: Arc<KeyspaceHolder>,
-        compression: Compression,
-        buffer_size: usize,
-        tcp_nodelay: bool,
-        event_handler: Option<Sender<Frame>>,
-    ) -> Self {
+    pub fn new(addr: SocketAddr, config: NodeTcpConfig) -> Self {
         TcpConnectionManager {
+            addr,
             config,
-            keyspace_holder,
-            compression,
-            buffer_size,
-            tcp_nodelay,
-            event_handler,
             connection: Default::default(),
         }
     }
 
     async fn establish_connection(&self) -> Result<TransportTcp> {
         let transport = TransportTcp::new(
-            self.config.addr,
-            self.keyspace_holder.clone(),
-            self.event_handler.clone(),
-            self.compression,
-            self.buffer_size,
-            self.tcp_nodelay,
+            self.addr,
+            self.config.keyspace_holder.clone(),
+            self.config.event_handler.clone(),
+            self.config.compression,
+            self.config.buffer_size,
+            self.config.tcp_nodelay,
         )
         .await?;
 
         startup(
             &transport,
             self.config.authenticator_provider.deref(),
-            self.keyspace_holder.deref(),
-            self.compression,
+            self.config.keyspace_holder.deref(),
+            self.config.compression,
         )
         .await?;
 
