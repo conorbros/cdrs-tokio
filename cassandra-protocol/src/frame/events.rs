@@ -1,3 +1,5 @@
+use crate::frame::Serialize;
+
 use derive_more::Display;
 use std::cmp::PartialEq;
 use std::io::Cursor;
@@ -207,6 +209,15 @@ pub struct SchemaChange {
     pub options: SchemaChangeOptions,
 }
 
+impl Serialize for SchemaChange {
+    fn serialize(&self, cursor: &mut Cursor<&mut Vec<u8>>) {
+        //CString::new(SCHEMA_CHANGE.into()).serialize(cursor);
+        self.change_type.serialize(cursor);
+        self.target.serialize(cursor);
+        self.options.serialize(cursor);
+    }
+}
+
 impl FromCursor for SchemaChange {
     fn from_cursor(cursor: &mut Cursor<&[u8]>) -> error::Result<SchemaChange> {
         let change_type = SchemaChangeType::from_cursor(cursor)?;
@@ -227,6 +238,16 @@ pub enum SchemaChangeType {
     Created,
     Updated,
     Dropped,
+}
+
+impl Serialize for SchemaChangeType {
+    fn serialize(&self, cursor: &mut Cursor<&mut Vec<u8>>) {
+        match self {
+            SchemaChangeType::Created => CString::new(CREATED.into()).serialize(cursor),
+            SchemaChangeType::Updated => CString::new(UPDATED.into()).serialize(cursor),
+            SchemaChangeType::Dropped => CString::new(DROPPED.into()).serialize(cursor),
+        }
+    }
 }
 
 impl FromCursor for SchemaChangeType {
@@ -251,6 +272,18 @@ pub enum SchemaChangeTarget {
     Type,
     Function,
     Aggregate,
+}
+
+impl Serialize for SchemaChangeTarget {
+    fn serialize(&self, cursor: &mut Cursor<&mut Vec<u8>>) {
+        match self {
+            SchemaChangeTarget::Keyspace => CString::new(KEYSPACE.into()).serialize(cursor),
+            SchemaChangeTarget::Table => CString::new(TABLE.into()).serialize(cursor),
+            SchemaChangeTarget::Type => CString::new(TYPE.into()).serialize(cursor),
+            SchemaChangeTarget::Function => CString::new(FUNCTION.into()).serialize(cursor),
+            SchemaChangeTarget::Aggregate => CString::new(AGGREGATE.into()).serialize(cursor),
+        }
+    }
 }
 
 impl FromCursor for SchemaChangeTarget {
@@ -281,6 +314,26 @@ pub enum SchemaChangeOptions {
     /// * the function/aggregate name
     /// * list of strings, one string for each argument type (as CQL type)
     FunctionAggregate(String, String, Vec<String>),
+}
+
+impl Serialize for SchemaChangeOptions {
+    fn serialize(&self, cursor: &mut Cursor<&mut Vec<u8>>) {
+        match self {
+            SchemaChangeOptions::Keyspace(ks) => {
+                CString::new(ks.to_string()).serialize(cursor);
+            }
+            SchemaChangeOptions::TableType(ks, t) => {
+                CString::new(ks.to_string()).serialize(cursor);
+                CString::new(t.to_string()).serialize(cursor);
+            }
+            SchemaChangeOptions::FunctionAggregate(ks, fa_name, list) => {
+                CString::new(ks.to_string()).serialize(cursor);
+                CString::new(fa_name.to_string()).serialize(cursor);
+                CStringList::new(list.iter().map(|x| CString::new(x.to_string())).collect())
+                    .serialize(cursor);
+            }
+        }
+    }
 }
 
 impl SchemaChangeOptions {

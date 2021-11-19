@@ -30,3 +30,5 @@ snap = "1"
 thiserror = "1"
 time = { version = "0.3", features = ["std", "macros"] }
 uuid = "0.8"
+criterion = "0.3.5"
+bytes = "1.1.0"

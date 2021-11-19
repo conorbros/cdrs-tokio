@@ -305,6 +305,10 @@ impl CStringList {
             .map(|string| string.into_plain())
             .collect()
     }
+
+    pub fn new(list: Vec<CString>) -> Self {
+        CStringList { list }
+    }
 }
 
 impl Serialize for CStringList {
