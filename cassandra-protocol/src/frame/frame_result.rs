@@ -95,7 +95,7 @@ pub enum ResResultBody {
 }
 
 impl ResResultBody {
-    fn parse_body_from_cursor(
+    pub fn parse_body_from_cursor(
         cursor: &mut Cursor<&[u8]>,
         result_kind: ResultKind,
     ) -> error::Result<ResResultBody> {
