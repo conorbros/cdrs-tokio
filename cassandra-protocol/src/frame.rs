@@ -1,18 +1,17 @@
 //! `frame` module contains general Frame functionality.
+use crate::compression::{Compression, CompressionError};
+use crate::frame::frame_request::RequestBody;
+use crate::frame::frame_response::ResponseBody;
+pub use crate::frame::traits::*;
+use crate::types::data_serialization_types::decode_timeuuid;
+use crate::types::{from_cursor_string_list, try_i16_from_bytes, try_i32_from_bytes, UUID_LEN};
 use bitflags::bitflags;
+use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
 use derive_more::{Constructor, Display};
 use std::convert::TryFrom;
 use std::io::Cursor;
 use uuid::Uuid;
-
-use crate::compression::{Compression, CompressionError};
-use crate::frame::frame_request::RequestBody;
-use crate::frame::frame_response::ResponseBody;
-use crate::types::data_serialization_types::decode_timeuuid;
-use crate::types::{from_cursor_string_list, try_i16_from_bytes, try_i32_from_bytes, UUID_LEN};
-
-pub use crate::frame::traits::*;
 
 /// Number of bytes in the header
 const HEADER_LEN: usize = 9;
@@ -149,6 +148,82 @@ impl Frame {
             compressor.decode(body_bytes.to_vec())
         } else {
             Compression::None.decode(body_bytes.to_vec())
+        }
+        .map_err(ParseFrameError::DecompressionError)?;
+
+        let body_len = full_body.len();
+
+        // Use cursor to get tracing id, warnings and actual body
+        let mut body_cursor = Cursor::new(full_body.as_slice());
+
+        let tracing_id = if flags.contains(Flags::TRACING) {
+            let mut tracing_bytes = [0; UUID_LEN];
+            std::io::Read::read_exact(&mut body_cursor, &mut tracing_bytes).unwrap();
+
+            Some(decode_timeuuid(&tracing_bytes).map_err(ParseFrameError::InvalidUuid)?)
+        } else {
+            None
+        };
+
+        let warnings = if flags.contains(Flags::WARNING) {
+            from_cursor_string_list(&mut body_cursor).map_err(ParseFrameError::InvalidWarnings)?
+        } else {
+            vec![]
+        };
+
+        let mut body = Vec::with_capacity(body_len - body_cursor.position() as usize);
+
+        std::io::Read::read_to_end(&mut body_cursor, &mut body)
+            .expect("Read cannot fail because cursor is backed by slice");
+
+        Ok(ParsedFrame::new(
+            frame_len,
+            Frame {
+                version,
+                direction,
+                flags,
+                opcode,
+                stream_id,
+                body,
+                tracing_id,
+                warnings,
+            },
+        ))
+    }
+
+    pub fn from_buffer_mut(
+        data: &mut BytesMut,
+        compressor: Compression,
+    ) -> Result<ParsedFrame, ParseFrameError> {
+        if data.len() < HEADER_LEN {
+            return Err(ParseFrameError::NotEnoughBytes);
+        }
+
+        let version_byte = data.take(1).into_inner().as_ref()[0];
+        let version = Version::try_from(version_byte)
+            .map_err(|_| ParseFrameError::UnsupportedVersion(data[0] & 0x7f))?;
+        let direction = Direction::from(version_byte);
+
+        let flags = Flags::from_bits_truncate(data.take(1).into_inner().as_ref()[0]);
+
+        let stream_id = try_i16_from_bytes(data.take(2).into_inner().as_ref()).unwrap();
+
+        let opcode_byte = data.take(1).into_inner().as_ref()[0];
+        let opcode = Opcode::try_from(opcode_byte)
+            .map_err(|_| ParseFrameError::UnsupportedOpcode(opcode_byte))?;
+
+        let body_len = try_i32_from_bytes(data.take(4).into_inner().as_ref()).unwrap() as usize;
+        let frame_len = HEADER_LEN + body_len;
+        if data.len() < frame_len {
+            return Err(ParseFrameError::NotEnoughBytes);
+        }
+
+        let body_bytes = data.take(body_len).into_inner();
+
+        let full_body = if flags.contains(Flags::COMPRESSION) {
+            compressor.decode(body_bytes.as_ref().to_vec())
+        } else {
+            Compression::None.decode(body_bytes.as_ref().to_vec())
         }
         .map_err(ParseFrameError::DecompressionError)?;
 
