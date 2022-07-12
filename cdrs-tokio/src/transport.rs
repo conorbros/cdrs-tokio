@@ -497,7 +497,9 @@ impl AsyncTransport {
 
                 request = match write_receiver.try_recv() {
                     Ok(request) => request,
-                    Err(_) => {
+                    Err(e) => {
+                        tracing::warn!("{e}");
+
                         Self::write_self_contained_frame(
                             &mut write_half,
                             response_handler_map,
@@ -548,6 +550,7 @@ impl AsyncTransport {
         frame_stream_ids: &mut Vec<StreamId>,
         frame: &[u8],
     ) -> Result<()> {
+        tracing::debug!("writing frame: {:x?}", frame);
         if let Err(error) = write_half.write_all(frame).await {
             Self::notify_error_handlers(response_handler_map, frame_stream_ids, error.into())?;
         }
