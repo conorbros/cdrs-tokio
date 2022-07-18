@@ -1,8 +1,5 @@
 #[cfg(feature = "e2e-tests")]
-use std::sync::Arc;
-
-#[cfg(feature = "e2e-tests")]
-use cassandra_protocol::frame::Version;
+use cdrs_tokio::authenticators::StaticPasswordAuthenticatorProvider;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::cluster::session::Session;
 #[cfg(feature = "e2e-tests")]
@@ -14,6 +11,8 @@ use cdrs_tokio::cluster::TcpConnectionManager;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::error::Result;
 #[cfg(feature = "e2e-tests")]
+use cdrs_tokio::frame::Version;
+#[cfg(feature = "e2e-tests")]
 use cdrs_tokio::load_balancing::RoundRobinLoadBalancingStrategy;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::retry::NeverReconnectionPolicy;
@@ -21,6 +20,8 @@ use cdrs_tokio::retry::NeverReconnectionPolicy;
 use cdrs_tokio::transport::TransportTcp;
 #[cfg(feature = "e2e-tests")]
 use regex::Regex;
+#[cfg(feature = "e2e-tests")]
+use std::sync::Arc;
 
 #[cfg(feature = "e2e-tests")]
 pub const ADDR: &str = "127.0.0.1:9042";
@@ -43,9 +44,14 @@ pub async fn setup_multiple(
     create_cqls: &[&'static str],
     version: Version,
 ) -> Result<CurrentSession> {
+    let user = "cassandra";
+    let password = "cassandra";
+    let auth = StaticPasswordAuthenticatorProvider::new(&user, &password);
+
     let cluster_config = NodeTcpConfigBuilder::new()
         .with_contact_point(ADDR.into())
         .with_version(version)
+        .with_authenticator_provider(Arc::new(auth))
         .build()
         .await
         .unwrap();
