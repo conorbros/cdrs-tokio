@@ -1,13 +1,12 @@
-use fxhash::{FxHashMap, FxHashSet};
-use std::collections::hash_map::Entry;
-use std::sync::Arc;
-use tracing::*;
-
 use crate::cluster::connection_pool::ConnectionPoolFactory;
 use crate::cluster::topology::{KeyspaceMetadata, Node, NodeState};
 use crate::cluster::{ClusterMetadata, ConnectionManager, NodeInfo};
 use crate::load_balancing::node_distance_evaluator::NodeDistanceEvaluator;
 use crate::transport::CdrsTransport;
+use fxhash::{FxHashMap, FxHashSet};
+use std::collections::hash_map::Entry;
+use std::sync::Arc;
+use tracing::*;
 
 pub fn build_initial_metadata<T: CdrsTransport, CM: ConnectionManager<T>>(
     node_infos: Vec<NodeInfo>,
@@ -137,12 +136,6 @@ pub fn add_new_node<T: CdrsTransport, CM: ConnectionManager<T>>(
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use cassandra_protocol::frame::Version;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::sync::Arc;
-    use tokio::sync::watch;
-    use uuid::Uuid;
-
     use crate::cluster::connection_manager::MockConnectionManager;
     use crate::cluster::connection_pool::ConnectionPoolFactory;
     use crate::cluster::metadata_builder::{
@@ -153,6 +146,11 @@ mod tests {
     use crate::cluster::{ClusterMetadata, NodeInfo};
     use crate::load_balancing::node_distance_evaluator::MockNodeDistanceEvaluator;
     use crate::transport::MockCdrsTransport;
+    use cassandra_protocol::envelope::Version;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
+    use tokio::sync::watch;
+    use uuid::Uuid;
 
     fn create_connection_pool_factory(
     ) -> Arc<ConnectionPoolFactory<MockCdrsTransport, MockConnectionManager<MockCdrsTransport>>>

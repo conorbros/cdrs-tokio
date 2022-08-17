@@ -1,19 +1,18 @@
+use super::blob::Blob;
+use super::decimal::Decimal;
+use super::duration::Duration;
+use crate::envelope::{FromCursor, Version};
+use crate::error;
+use crate::types::{
+    try_f32_from_bytes, try_f64_from_bytes, try_i16_from_bytes, try_i32_from_bytes,
+    try_i64_from_bytes, u16_from_bytes, CBytes, CInt, INT_LEN,
+};
 use arrayref::array_ref;
 use integer_encoding::VarInt;
 use num::BigInt;
 use std::io;
 use std::net;
 use std::string::FromUtf8Error;
-
-use super::blob::Blob;
-use super::decimal::Decimal;
-use super::duration::Duration;
-use crate::error;
-use crate::frame::{FromCursor, Version};
-use crate::types::{
-    try_f32_from_bytes, try_f64_from_bytes, try_i16_from_bytes, try_i32_from_bytes,
-    try_i64_from_bytes, u16_from_bytes, CBytes, CInt, INT_LEN,
-};
 
 // https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec#L813
 
@@ -263,8 +262,8 @@ pub fn decode_tuple(bytes: &[u8], l: usize, version: Version) -> Result<Vec<CByt
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use super::super::super::frame::message_result::*;
     use super::*;
+    use crate::envelope::message_result::{ColType, ColTypeOption, ColTypeOptionValue};
     use crate::types::{to_float, to_float_big};
     use float_eq::*;
     use std::net::IpAddr;

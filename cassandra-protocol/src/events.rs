@@ -1,4 +1,4 @@
-use crate::frame::events::{
+use crate::envelope::events::{
     SchemaChange as MessageSchemaChange, ServerEvent as MessageServerEvent,
     SimpleServerEvent as MessageSimpleServerEvent,
 };

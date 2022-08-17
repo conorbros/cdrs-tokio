@@ -1,9 +1,8 @@
+use crate::envelope::{FromCursor, Serialize, Version};
+use crate::error;
+use crate::types::INT_LEN;
 use bitflags::bitflags;
 use std::io::{Cursor, Read};
-
-use crate::error;
-use crate::frame::{FromCursor, Serialize, Version};
-use crate::types::INT_LEN;
 
 bitflags! {
     pub struct QueryFlags: u32 {

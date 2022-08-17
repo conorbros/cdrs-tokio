@@ -1,16 +1,8 @@
-use std::net::IpAddr;
-use std::num::{NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8};
-use std::sync::Arc;
-
-use chrono::prelude::*;
-use time::PrimitiveDateTime;
-use uuid::Uuid;
-
-use crate::error::{column_is_empty_err, Error, Result};
-use crate::frame::message_result::{
+use crate::envelope::message_result::{
     BodyResResultRows, ColSpec, ColType, ColTypeOption, ColTypeOptionValue, RowsMetadata,
 };
-use crate::frame::Version;
+use crate::envelope::Version;
+use crate::error::{column_is_empty_err, Error, Result};
 use crate::types::blob::Blob;
 use crate::types::data_serialization_types::*;
 use crate::types::decimal::Decimal;
@@ -19,7 +11,13 @@ use crate::types::map::Map;
 use crate::types::tuple::Tuple;
 use crate::types::udt::Udt;
 use crate::types::{ByIndex, ByName, CBytes, IntoRustByIndex, IntoRustByName};
+use chrono::prelude::*;
 use num::BigInt;
+use std::net::IpAddr;
+use std::num::{NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8};
+use std::sync::Arc;
+use time::PrimitiveDateTime;
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct Row {

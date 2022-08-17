@@ -1,12 +1,11 @@
+use super::prelude::{Blob, Decimal, Duration};
+use crate::envelope::message_result::{ColType, ColTypeOption};
+use crate::envelope::Version;
+use crate::error::Result as CDRSResult;
+use crate::types::CBytes;
 use num::BigInt;
 use std::collections::HashMap;
 use std::net::IpAddr;
-
-use super::prelude::{Blob, Decimal, Duration};
-use crate::error::Result as CDRSResult;
-use crate::frame::message_result::{ColType, ColTypeOption};
-use crate::frame::Version;
-use crate::types::CBytes;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum CassandraType {
@@ -75,9 +74,9 @@ pub fn wrapper_fn(
 
 pub mod wrappers {
     use super::CassandraType;
+    use crate::envelope::message_result::{ColType, ColTypeOption, ColTypeOptionValue};
+    use crate::envelope::Version;
     use crate::error::Result as CDRSResult;
-    use crate::frame::message_result::{ColType, ColTypeOption, ColTypeOptionValue};
-    use crate::frame::Version;
     use crate::types::data_serialization_types::*;
     use crate::types::list::List;
     use crate::types::AsCassandraType;

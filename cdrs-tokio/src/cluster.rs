@@ -17,10 +17,9 @@ pub use self::topology::cluster_metadata::ClusterMetadata;
 use crate::cluster::connection_pool::ConnectionPoolConfig;
 use crate::future::BoxFuture;
 use crate::transport::CdrsTransport;
+use cassandra_protocol::envelope::Version;
 use cassandra_protocol::error;
-use cassandra_protocol::frame::Version;
 use std::sync::Arc;
-
 mod cluster_metadata_manager;
 #[cfg(feature = "rust-tls")]
 mod config_rustls;

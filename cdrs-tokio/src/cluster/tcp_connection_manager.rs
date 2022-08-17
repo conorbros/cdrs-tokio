@@ -1,10 +1,3 @@
-use futures::FutureExt;
-use std::net::SocketAddr;
-use std::ops::Deref;
-use std::sync::Arc;
-use tokio::sync::mpsc::Sender;
-use tokio::time::sleep;
-
 use crate::cluster::connection_manager::{startup, ConnectionManager};
 use crate::cluster::KeyspaceHolder;
 use crate::frame_encoding::FrameEncodingFactory;
@@ -13,8 +6,14 @@ use crate::retry::ReconnectionPolicy;
 use crate::transport::TransportTcp;
 use cassandra_protocol::authenticators::SaslAuthenticatorProvider;
 use cassandra_protocol::compression::Compression;
+use cassandra_protocol::envelope::{Envelope, Version};
 use cassandra_protocol::error::{Error, Result};
-use cassandra_protocol::frame::{Envelope, Version};
+use futures::FutureExt;
+use std::net::SocketAddr;
+use std::ops::Deref;
+use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
+use tokio::time::sleep;
 
 pub struct TcpConnectionManager {
     authenticator_provider: Arc<dyn SaslAuthenticatorProvider + Send + Sync>,

@@ -1,11 +1,11 @@
 mod common;
 
 #[cfg(feature = "e2e-tests")]
-use cassandra_protocol::frame::Version;
+use cassandra_protocol::envelope::Version;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::consistency::Consistency;
 #[cfg(feature = "e2e-tests")]
-use cdrs_tokio::frame::TryFromRow;
+use cdrs_tokio::envelope::TryFromRow;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::query::QueryValues;
 #[cfg(feature = "e2e-tests")]

@@ -1,4 +1,6 @@
 #[cfg(feature = "e2e-tests")]
+use cassandra_protocol::envelope::Version;
+#[cfg(feature = "e2e-tests")]
 use cdrs_tokio::authenticators::StaticPasswordAuthenticatorProvider;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::cluster::session::Session;
@@ -10,8 +12,6 @@ use cdrs_tokio::cluster::NodeTcpConfigBuilder;
 use cdrs_tokio::cluster::TcpConnectionManager;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::error::Result;
-#[cfg(feature = "e2e-tests")]
-use cdrs_tokio::frame::Version;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::load_balancing::RoundRobinLoadBalancingStrategy;
 #[cfg(feature = "e2e-tests")]

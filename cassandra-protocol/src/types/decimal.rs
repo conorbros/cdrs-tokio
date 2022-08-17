@@ -1,9 +1,8 @@
+use crate::envelope::{Serialize, Version};
 use derive_more::Constructor;
 use float_eq::*;
 use num::BigInt;
 use std::io::Cursor;
-
-use crate::frame::{Serialize, Version};
 
 /// Cassandra Decimal type
 #[derive(Debug, Clone, PartialEq, Constructor, Ord, PartialOrd, Eq, Hash)]

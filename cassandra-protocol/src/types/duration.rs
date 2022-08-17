@@ -1,8 +1,7 @@
+use crate::envelope::{Serialize, Version};
 use integer_encoding::VarInt;
 use std::io::{Cursor, Write};
 use thiserror::Error;
-
-use crate::frame::{Serialize, Version};
 
 /// Possible `Duration` creation error.
 #[derive(Debug, Error, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -77,7 +76,7 @@ impl Serialize for Duration {
 
 #[cfg(test)]
 mod tests {
-    use crate::frame::{Serialize, Version};
+    use crate::envelope::{Serialize, Version};
     use crate::types::duration::Duration;
 
     #[test]

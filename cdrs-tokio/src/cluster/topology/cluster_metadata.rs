@@ -1,14 +1,13 @@
-use fxhash::FxHashMap;
-use itertools::Itertools;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use uuid::Uuid;
-
 use crate::cluster::topology::keyspace_metadata::KeyspaceMetadata;
 use crate::cluster::topology::node::Node;
 use crate::cluster::topology::{DatacenterMetadata, NodeMap};
 use crate::cluster::{ConnectionManager, TokenMap};
 use crate::transport::CdrsTransport;
+use fxhash::FxHashMap;
+use itertools::Itertools;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use uuid::Uuid;
 
 fn build_datacenter_info<T: CdrsTransport, CM: ConnectionManager<T>>(
     nodes: &NodeMap<T, CM>,
@@ -247,18 +246,17 @@ impl<T: CdrsTransport, CM: ConnectionManager<T>> Default for ClusterMetadata<T, 
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use cassandra_protocol::frame::Version;
-    use fxhash::FxHashMap;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::sync::Arc;
-    use tokio::sync::watch;
-    use uuid::Uuid;
-
     use crate::cluster::connection_manager::MockConnectionManager;
     use crate::cluster::connection_pool::ConnectionPoolFactory;
     use crate::cluster::topology::cluster_metadata::build_datacenter_info;
     use crate::cluster::topology::Node;
     use crate::transport::MockCdrsTransport;
+    use cassandra_protocol::envelope::Version;
+    use fxhash::FxHashMap;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
+    use tokio::sync::watch;
+    use uuid::Uuid;
 
     #[test]
     fn should_build_datacenter_info() {

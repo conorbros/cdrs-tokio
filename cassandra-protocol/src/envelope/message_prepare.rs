@@ -1,11 +1,10 @@
-use std::io::Cursor;
-
+use crate::envelope::{Direction, Envelope, Flags, FromCursor, Opcode, Serialize, Version};
 use crate::error;
-use crate::frame::{Direction, Envelope, Flags, FromCursor, Opcode, Serialize, Version};
 use crate::query::PrepareFlags;
 use crate::types::{
     from_cursor_str, from_cursor_str_long, serialize_str, serialize_str_long, INT_LEN, SHORT_LEN,
 };
+use std::io::Cursor;
 
 /// Struct that represents a body of a envelope of type `prepare`
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Clone, Default)]
@@ -109,8 +108,8 @@ impl Envelope {
 mod tests {
     use std::io::Cursor;
 
-    use crate::frame::message_prepare::BodyReqPrepare;
-    use crate::frame::{FromCursor, Serialize, Version};
+    use crate::envelope::message_prepare::BodyReqPrepare;
+    use crate::envelope::{FromCursor, Serialize, Version};
 
     #[test]
     fn should_deserialize_body() {

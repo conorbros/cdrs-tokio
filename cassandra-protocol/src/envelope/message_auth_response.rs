@@ -1,9 +1,8 @@
+use crate::envelope::{Direction, Envelope, Flags, FromCursor, Opcode, Serialize, Version};
+use crate::error;
+use crate::types::CBytes;
 use derive_more::Constructor;
 use std::io::Cursor;
-
-use crate::error;
-use crate::frame::{Direction, Envelope, Flags, FromCursor, Opcode, Serialize, Version};
-use crate::types::CBytes;
 
 #[derive(Debug, Constructor, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct BodyReqAuthResponse {

@@ -1,6 +1,6 @@
 use crate::consistency::Consistency;
+use crate::envelope::message_batch::{BatchQuery, BatchQuerySubj, BatchType, BodyReqBatch};
 use crate::error::{Error as CError, Result as CResult};
-use crate::frame::message_batch::{BatchQuery, BatchQuerySubj, BatchType, BodyReqBatch};
 use crate::query::{PreparedQuery, QueryValues};
 use crate::types::{CInt, CLong};
 

@@ -1,5 +1,9 @@
+use crate::cluster::topology::NodeDistance;
+use crate::cluster::ConnectionManager;
+use crate::error::{Error, Result as CdrsResult};
+use crate::transport::CdrsTransport;
 use arc_swap::{ArcSwap, AsRaw};
-use cassandra_protocol::frame::{Envelope, Version};
+use cassandra_protocol::envelope::{Envelope, Version};
 use cassandra_protocol::query::utils::quote;
 use futures::future::{join_all, try_join_all};
 use std::marker::PhantomData;
@@ -9,11 +13,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch::Receiver;
 use tracing::*;
-
-use crate::cluster::topology::NodeDistance;
-use crate::cluster::ConnectionManager;
-use crate::error::{Error, Result as CdrsResult};
-use crate::transport::CdrsTransport;
 
 async fn new_connection<T: CdrsTransport, CM: ConnectionManager<T>>(
     connection_manager: &CM,

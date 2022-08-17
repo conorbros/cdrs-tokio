@@ -1,19 +1,17 @@
-use std::io;
-use std::net::SocketAddr;
-use tokio::sync::mpsc::Sender;
-
-#[cfg(test)]
-use mockall::*;
-
 use crate::cluster::KeyspaceHolder;
 use crate::future::BoxFuture;
 use crate::transport::CdrsTransport;
 use cassandra_protocol::authenticators::SaslAuthenticatorProvider;
 use cassandra_protocol::compression::Compression;
+use cassandra_protocol::envelope::message_response::ResponseBody;
+use cassandra_protocol::envelope::{Envelope, Opcode, Version};
 use cassandra_protocol::error::{Error, Result};
-use cassandra_protocol::frame::message_response::ResponseBody;
-use cassandra_protocol::frame::{Envelope, Opcode, Version};
 use cassandra_protocol::query::utils::quote;
+#[cfg(test)]
+use mockall::*;
+use std::io;
+use std::net::SocketAddr;
+use tokio::sync::mpsc::Sender;
 
 /// Manages establishing connections to nodes.
 pub trait ConnectionManager<T: CdrsTransport>: Send + Sync {

@@ -1,17 +1,16 @@
-use std::io::Cursor;
-
-use crate::frame::message_auth_challenge::BodyResAuthChallenge;
-use crate::frame::message_auth_success::BodyReqAuthSuccess;
-use crate::frame::message_authenticate::BodyResAuthenticate;
-use crate::frame::message_error::ErrorBody;
-use crate::frame::message_event::BodyResEvent;
-use crate::frame::message_result::{
+use crate::envelope::message_auth_challenge::BodyResAuthChallenge;
+use crate::envelope::message_auth_success::BodyReqAuthSuccess;
+use crate::envelope::message_authenticate::BodyResAuthenticate;
+use crate::envelope::message_error::ErrorBody;
+use crate::envelope::message_event::BodyResEvent;
+use crate::envelope::message_result::{
     BodyResResultPrepared, BodyResResultRows, BodyResResultSetKeyspace, ResResultBody, RowsMetadata,
 };
-use crate::frame::message_supported::BodyResSupported;
-use crate::frame::{FromCursor, Opcode, Version};
+use crate::envelope::message_supported::BodyResSupported;
+use crate::envelope::{FromCursor, Opcode, Version};
 use crate::types::rows::Row;
 use crate::{error, Error};
+use std::io::Cursor;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ResponseBody {
@@ -27,7 +26,7 @@ pub enum ResponseBody {
 
 // This implementation is incomplete so only enable in tests
 #[cfg(test)]
-use crate::frame::Serialize;
+use crate::envelope::Serialize;
 #[cfg(test)]
 impl Serialize for ResponseBody {
     fn serialize(&self, cursor: &mut Cursor<&mut Vec<u8>>, version: Version) {

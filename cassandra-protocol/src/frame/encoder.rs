@@ -1,11 +1,12 @@
-use lz4_flex::block::get_maximum_output_size;
-use lz4_flex::{compress, compress_into};
-
+use crate::compression::Compression;
 use crate::crc::{crc24, crc32};
-use crate::frame::{
+use crate::envelope::Version;
+use crate::envelope::{
     COMPRESSED_FRAME_HEADER_LENGTH, FRAME_TRAILER_LENGTH, PAYLOAD_SIZE_LIMIT,
     UNCOMPRESSED_FRAME_HEADER_LENGTH,
 };
+use lz4_flex::block::get_maximum_output_size;
+use lz4_flex::{compress, compress_into};
 
 #[inline]
 fn put3b(buffer: &mut [u8], value: i32) {
@@ -27,6 +28,84 @@ fn add_trailer(buffer: &mut Vec<u8>, payload_start: usize) {
     buffer.push(crc[3]);
 }
 
+#[derive(Debug, Clone)]
+pub enum FrameEncoder {
+    LegacyFrameEncoder(LegacyFrameEncoder),
+    UncompressedFrameEncoder(UncompressedFrameEncoder),
+    Lz4FrameEncoder(Lz4FrameEncoder),
+}
+
+impl FrameEncoder {
+    pub fn create_encoder(version: Version, compression: Compression) -> Self {
+        if version >= Version::V5 {
+            match compression {
+                Compression::Lz4 => Self::Lz4FrameEncoder(Lz4FrameEncoder::default()),
+                // >= v5 supports only lz4 => fall back to uncompressed
+                _ => Self::UncompressedFrameEncoder(UncompressedFrameEncoder::default()),
+            }
+        } else {
+            Self::LegacyFrameEncoder(LegacyFrameEncoder::default())
+        }
+    }
+}
+
+impl FrameEncode for FrameEncoder {
+    /// Determines if payload of given size can fit in current frame buffer.
+    fn can_fit(&self, len: usize) -> bool {
+        match self {
+            FrameEncoder::LegacyFrameEncoder(f) => f.can_fit(len),
+            FrameEncoder::UncompressedFrameEncoder(f) => f.can_fit(len),
+            FrameEncoder::Lz4FrameEncoder(f) => f.can_fit(len),
+        }
+    }
+
+    /// Resets the internal state and prepares it for encoding envelopes.
+    fn reset(&mut self) {
+        match self {
+            FrameEncoder::LegacyFrameEncoder(f) => f.reset(),
+            FrameEncoder::UncompressedFrameEncoder(f) => f.reset(),
+            FrameEncoder::Lz4FrameEncoder(f) => f.reset(),
+        }
+    }
+
+    /// Adds a self-contained envelope to current frame.
+    fn add_envelope(&mut self, envelope: Vec<u8>) {
+        match self {
+            FrameEncoder::LegacyFrameEncoder(f) => f.add_envelope(envelope),
+            FrameEncoder::UncompressedFrameEncoder(f) => f.add_envelope(envelope),
+            FrameEncoder::Lz4FrameEncoder(f) => f.add_envelope(envelope),
+        }
+    }
+
+    /// Finalizes a self-contained encoded frame in the buffer.
+    fn finalize_self_contained(&mut self) -> &[u8] {
+        match self {
+            FrameEncoder::LegacyFrameEncoder(f) => f.finalize_self_contained(),
+            FrameEncoder::UncompressedFrameEncoder(f) => f.finalize_self_contained(),
+            FrameEncoder::Lz4FrameEncoder(f) => f.finalize_self_contained(),
+        }
+    }
+
+    /// Appends a large envelope and finalizes non self-contained encoded frame in the buffer.
+    /// Copies as much envelope data as possible and returns new envelope buffer start.
+    fn finalize_non_self_contained(&mut self, envelope: &[u8]) -> (usize, &[u8]) {
+        match self {
+            FrameEncoder::LegacyFrameEncoder(f) => f.finalize_non_self_contained(envelope),
+            FrameEncoder::UncompressedFrameEncoder(f) => f.finalize_non_self_contained(envelope),
+            FrameEncoder::Lz4FrameEncoder(f) => f.finalize_non_self_contained(envelope),
+        }
+    }
+
+    /// Checks if current frame contains any envelopes.
+    fn has_envelopes(&self) -> bool {
+        match self {
+            FrameEncoder::LegacyFrameEncoder(f) => f.has_envelopes(),
+            FrameEncoder::UncompressedFrameEncoder(f) => f.has_envelopes(),
+            FrameEncoder::Lz4FrameEncoder(f) => f.has_envelopes(),
+        }
+    }
+}
+
 /// An encoder for frames. Since protocol *v5*, frames became "envelopes" and a frame now can contain
 /// multiple complete envelopes (self-contained frame) or a part of one bigger envelope.
 ///
@@ -38,7 +117,7 @@ fn add_trailer(buffer: &mut Vec<u8>, payload_start: usize) {
 /// adding the first one or after calling [`reset_buffer`]. At some point, the frame can become
 /// finalized (which is the only possible case when adding a non self-contained envelope) and the
 /// returned buffer is assumed to be immutable and ready to be sent.  
-pub trait FrameEncoder {
+pub trait FrameEncode {
     /// Determines if payload of given size can fit in current frame buffer.
     fn can_fit(&self, len: usize) -> bool;
 
@@ -65,7 +144,7 @@ pub struct LegacyFrameEncoder {
     buffer: Vec<u8>,
 }
 
-impl FrameEncoder for LegacyFrameEncoder {
+impl FrameEncode for LegacyFrameEncoder {
     #[inline]
     fn can_fit(&self, _len: usize) -> bool {
         // we support only one envelope per frame
@@ -111,7 +190,7 @@ pub struct UncompressedFrameEncoder {
     buffer: Vec<u8>,
 }
 
-impl FrameEncoder for UncompressedFrameEncoder {
+impl FrameEncode for UncompressedFrameEncoder {
     #[inline]
     fn can_fit(&self, len: usize) -> bool {
         (self.buffer.len() - UNCOMPRESSED_FRAME_HEADER_LENGTH).saturating_add(len)
@@ -188,7 +267,7 @@ pub struct Lz4FrameEncoder {
     buffer: Vec<u8>,
 }
 
-impl FrameEncoder for Lz4FrameEncoder {
+impl FrameEncode for Lz4FrameEncoder {
     #[inline]
     fn can_fit(&self, len: usize) -> bool {
         // we don't know the whole compressed payload size, so we need to be conservative and expect

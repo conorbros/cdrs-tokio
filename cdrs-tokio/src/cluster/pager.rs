@@ -1,15 +1,14 @@
-use cassandra_protocol::consistency::Consistency;
-use cassandra_protocol::error;
-use cassandra_protocol::frame::message_result::RowsMetadataFlags;
-use cassandra_protocol::query::{PreparedQuery, QueryParams, QueryParamsBuilder, QueryValues};
-use cassandra_protocol::types::rows::Row;
-use cassandra_protocol::types::CBytes;
-
 use crate::cluster::session::Session;
 use crate::cluster::ConnectionManager;
 use crate::load_balancing::LoadBalancingStrategy;
 use crate::statement::StatementParamsBuilder;
 use crate::transport::CdrsTransport;
+use cassandra_protocol::consistency::Consistency;
+use cassandra_protocol::envelope::message_result::RowsMetadataFlags;
+use cassandra_protocol::error;
+use cassandra_protocol::query::{PreparedQuery, QueryParams, QueryParamsBuilder, QueryValues};
+use cassandra_protocol::types::rows::Row;
+use cassandra_protocol::types::CBytes;
 
 pub struct SessionPager<
     'a,

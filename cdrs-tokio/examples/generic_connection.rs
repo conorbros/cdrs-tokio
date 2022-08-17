@@ -26,7 +26,7 @@ use cdrs_tokio::cluster::session::{
 };
 use cdrs_tokio::cluster::{ConnectionManager, KeyspaceHolder};
 use cdrs_tokio::compression::Compression;
-use cdrs_tokio::frame::{Envelope, Version};
+use cdrs_tokio::envelope::{Envelope, Version};
 use cdrs_tokio::frame_encoding::ProtocolFrameEncodingFactory;
 use cdrs_tokio::future::BoxFuture;
 use cdrs_tokio::load_balancing::node_distance_evaluator::AllLocalNodeDistanceEvaluator;

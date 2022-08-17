@@ -1,13 +1,6 @@
-use chrono::prelude::*;
-use num::BigInt;
-use std::hash::{Hash, Hasher};
-use std::net::IpAddr;
-use time::PrimitiveDateTime;
-use uuid::Uuid;
-
+use crate::envelope::message_result::{CTuple, ColType, ColTypeOption, ColTypeOptionValue};
+use crate::envelope::Version;
 use crate::error::{column_is_empty_err, Error, Result};
-use crate::frame::message_result::{CTuple, ColType, ColTypeOption, ColTypeOptionValue};
-use crate::frame::Version;
 use crate::types::blob::Blob;
 use crate::types::data_serialization_types::*;
 use crate::types::decimal::Decimal;
@@ -15,6 +8,12 @@ use crate::types::list::List;
 use crate::types::map::Map;
 use crate::types::udt::Udt;
 use crate::types::{ByIndex, CBytes, IntoRustByIndex};
+use chrono::prelude::*;
+use num::BigInt;
+use std::hash::{Hash, Hasher};
+use std::net::IpAddr;
+use time::PrimitiveDateTime;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct Tuple {

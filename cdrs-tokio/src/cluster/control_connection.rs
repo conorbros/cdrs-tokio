@@ -1,3 +1,10 @@
+use crate::cluster::topology::Node;
+use crate::cluster::{ClusterMetadataManager, ConnectionManager, SessionContext};
+use crate::load_balancing::LoadBalancingStrategy;
+use crate::retry::{ReconnectionPolicy, ReconnectionSchedule};
+use crate::transport::CdrsTransport;
+use cassandra_protocol::envelope::{Envelope, Version};
+use cassandra_protocol::events::{ServerEvent, SimpleServerEvent};
 use derive_more::Constructor;
 use std::sync::Arc;
 use std::time::Duration;
@@ -5,14 +12,6 @@ use tokio::sync::broadcast::Sender;
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio::time::sleep;
 use tracing::*;
-
-use crate::cluster::topology::Node;
-use crate::cluster::{ClusterMetadataManager, ConnectionManager, SessionContext};
-use crate::load_balancing::LoadBalancingStrategy;
-use crate::retry::{ReconnectionPolicy, ReconnectionSchedule};
-use crate::transport::CdrsTransport;
-use cassandra_protocol::events::{ServerEvent, SimpleServerEvent};
-use cassandra_protocol::frame::{Envelope, Version};
 
 const DEFAULT_RECONNECT_DELAY: Duration = Duration::from_secs(10);
 const EVENT_CHANNEL_CAPACITY: usize = 32;

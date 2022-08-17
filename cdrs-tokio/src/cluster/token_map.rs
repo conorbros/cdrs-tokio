@@ -1,12 +1,11 @@
+use crate::cluster::topology::{Node, NodeMap};
+use crate::cluster::ConnectionManager;
+use crate::transport::CdrsTransport;
 use cassandra_protocol::token::Murmur3Token;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::net::SocketAddr;
 use std::sync::Arc;
-
-use crate::cluster::topology::{Node, NodeMap};
-use crate::cluster::ConnectionManager;
-use crate::transport::CdrsTransport;
 
 /// Map of tokens to nodes.
 pub struct TokenMap<T: CdrsTransport + 'static, CM: ConnectionManager<T> + 'static> {
@@ -108,7 +107,12 @@ impl<T: CdrsTransport, CM: ConnectionManager<T>> TokenMap<T, CM> {
 
 #[cfg(test)]
 mod tests {
-    use cassandra_protocol::frame::Version;
+    use crate::cluster::connection_manager::MockConnectionManager;
+    use crate::cluster::connection_pool::ConnectionPoolFactory;
+    use crate::cluster::topology::{Node, NodeMap};
+    use crate::cluster::TokenMap;
+    use crate::transport::MockCdrsTransport;
+    use cassandra_protocol::envelope::Version;
     use cassandra_protocol::token::Murmur3Token;
     use itertools::Itertools;
     use lazy_static::lazy_static;
@@ -116,12 +120,6 @@ mod tests {
     use std::sync::Arc;
     use tokio::sync::watch;
     use uuid::Uuid;
-
-    use crate::cluster::connection_manager::MockConnectionManager;
-    use crate::cluster::connection_pool::ConnectionPoolFactory;
-    use crate::cluster::topology::{Node, NodeMap};
-    use crate::cluster::TokenMap;
-    use crate::transport::MockCdrsTransport;
 
     lazy_static! {
         static ref HOST_ID_1: Uuid = Uuid::new_v4();

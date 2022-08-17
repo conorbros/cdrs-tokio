@@ -1,11 +1,11 @@
 use cassandra_protocol::compression::Compression;
-use cassandra_protocol::frame::frame_decoder::{
-    FrameDecoder, LegacyFrameDecoder, Lz4FrameDecoder, UncompressedFrameDecoder,
+use cassandra_protocol::envelope::Version;
+use cassandra_protocol::frame::decoder::{
+    FrameDecode, LegacyFrameDecoder, Lz4FrameDecoder, UncompressedFrameDecoder,
 };
-use cassandra_protocol::frame::frame_encoder::{
-    FrameEncoder, LegacyFrameEncoder, Lz4FrameEncoder, UncompressedFrameEncoder,
+use cassandra_protocol::frame::encoder::{
+    FrameEncode, LegacyFrameEncoder, Lz4FrameEncoder, UncompressedFrameEncoder,
 };
-use cassandra_protocol::frame::Version;
 
 /// A factory for frame encoder/decoder.
 pub trait FrameEncodingFactory {
@@ -14,14 +14,14 @@ pub trait FrameEncodingFactory {
         &self,
         version: Version,
         compression: Compression,
-    ) -> Box<dyn FrameEncoder + Send + Sync>;
+    ) -> Box<dyn FrameEncode + Send + Sync>;
 
     /// Creates a new frame decoder based on given protocol settings.
     fn create_decoder(
         &self,
         version: Version,
         compression: Compression,
-    ) -> Box<dyn FrameDecoder + Send + Sync>;
+    ) -> Box<dyn FrameDecode + Send + Sync>;
 }
 
 /// Frame encoding factor based on protocol settings.
@@ -33,7 +33,7 @@ impl FrameEncodingFactory for ProtocolFrameEncodingFactory {
         &self,
         version: Version,
         compression: Compression,
-    ) -> Box<dyn FrameEncoder + Send + Sync> {
+    ) -> Box<dyn FrameEncode + Send + Sync> {
         if version >= Version::V5 {
             match compression {
                 Compression::Lz4 => Box::new(Lz4FrameEncoder::default()),
@@ -49,7 +49,7 @@ impl FrameEncodingFactory for ProtocolFrameEncodingFactory {
         &self,
         version: Version,
         compression: Compression,
-    ) -> Box<dyn FrameDecoder + Send + Sync> {
+    ) -> Box<dyn FrameDecode + Send + Sync> {
         if version >= Version::V5 {
             match compression {
                 Compression::Lz4 => Box::new(Lz4FrameDecoder::default()),

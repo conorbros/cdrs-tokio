@@ -1,10 +1,8 @@
-use std::io::Cursor;
-
-use crate::error;
-use crate::frame::{FromCursor, Version};
-use crate::types::{from_cursor_str, serialize_str};
-
 use super::Serialize;
+use crate::envelope::{FromCursor, Version};
+use crate::error;
+use crate::types::{from_cursor_str, serialize_str};
+use std::io::Cursor;
 
 /// A server authentication challenge.
 #[derive(Debug, PartialEq, Ord, PartialOrd, Eq, Hash, Clone)]
@@ -32,8 +30,8 @@ impl FromCursor for BodyResAuthenticate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frame::traits::FromCursor;
-    use crate::frame::Version;
+    use crate::envelope::traits::FromCursor;
+    use crate::envelope::Version;
     use std::io::Cursor;
 
     #[test]

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
+use crate::envelope::{FromCursor, Version};
 use crate::error;
-use crate::frame::{FromCursor, Version};
 use crate::types::{from_cursor_str, from_cursor_string_list, serialize_str, CIntShort, SHORT_LEN};
 
 use super::Serialize;
@@ -48,8 +48,8 @@ impl FromCursor for BodyResSupported {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frame::traits::FromCursor;
-    use crate::frame::Version;
+    use crate::envelope::traits::FromCursor;
+    use crate::envelope::Version;
     use std::io::Cursor;
 
     #[test]

@@ -1,10 +1,8 @@
-use std::io::Cursor;
-
-use crate::error;
-use crate::frame::{FromCursor, Version};
-use crate::types::CBytes;
-
 use super::Serialize;
+use crate::envelope::{FromCursor, Version};
+use crate::error;
+use crate::types::CBytes;
+use std::io::Cursor;
 
 /// `BodyReqAuthSuccess` is a envelope that represents a successful authentication response.
 #[derive(Debug, PartialEq, Ord, PartialOrd, Eq, Hash, Clone)]
@@ -30,7 +28,7 @@ impl FromCursor for BodyReqAuthSuccess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frame::traits::FromCursor;
+    use crate::envelope::traits::FromCursor;
     use std::io::Cursor;
 
     #[test]

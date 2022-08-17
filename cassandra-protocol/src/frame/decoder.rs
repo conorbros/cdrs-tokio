@@ -1,14 +1,15 @@
+use crate::compression::{Compression, CompressionError};
+use crate::crc::{crc24, crc32};
+use crate::envelope::Version;
+use crate::envelope::{
+    CheckEnvelopeSizeError, Envelope, ParseEnvelopeError, COMPRESSED_FRAME_HEADER_LENGTH,
+    ENVELOPE_HEADER_LEN, FRAME_TRAILER_LENGTH, MAX_FRAME_SIZE, PAYLOAD_SIZE_LIMIT,
+    UNCOMPRESSED_FRAME_HEADER_LENGTH,
+};
+use crate::error::{Error, Result};
 use lz4_flex::decompress;
 use std::convert::TryInto;
 use std::io;
-
-use crate::compression::{Compression, CompressionError};
-use crate::crc::{crc24, crc32};
-use crate::error::{Error, Result};
-use crate::frame::{
-    Envelope, ParseEnvelopeError, COMPRESSED_FRAME_HEADER_LENGTH, ENVELOPE_HEADER_LEN,
-    FRAME_TRAILER_LENGTH, MAX_FRAME_SIZE, PAYLOAD_SIZE_LIMIT, UNCOMPRESSED_FRAME_HEADER_LENGTH,
-};
 
 #[inline]
 fn create_unexpected_self_contained_error() -> Error {
@@ -33,7 +34,10 @@ fn create_payload_crc_mismatch_error(computed_crc: u32, payload_crc32: u32) -> E
     .into()
 }
 
-fn extract_envelopes(buffer: &[u8], compression: Compression) -> Result<(usize, Vec<Envelope>)> {
+fn extract_parsed_envelopes(
+    buffer: &[u8],
+    compression: Compression,
+) -> Result<(usize, Vec<Envelope>)> {
     let mut current_pos = 0;
     let mut envelopes = vec![];
 
@@ -51,26 +55,113 @@ fn extract_envelopes(buffer: &[u8], compression: Compression) -> Result<(usize, 
     Ok((current_pos, envelopes))
 }
 
-fn try_decode_envelopes_with_spare_data(
+fn try_decode_parsed_envelopes_with_spare_data(
     buffer: &mut Vec<u8>,
     compression: Compression,
 ) -> Result<(Vec<Envelope>, Vec<u8>)> {
-    let (current_pos, envelopes) = extract_envelopes(buffer.as_slice(), compression)?;
+    let (current_pos, envelopes) = extract_parsed_envelopes(buffer.as_slice(), compression)?;
     Ok((envelopes, buffer.split_off(current_pos)))
 }
 
-fn try_decode_envelopes_without_spare_data(buffer: &[u8]) -> Result<Vec<Envelope>> {
-    let (_, envelopes) = extract_envelopes(buffer, Compression::None)?;
+fn try_decode_parsed_envelopes_without_spare_data(buffer: &[u8]) -> Result<Vec<Envelope>> {
+    let (_, envelopes) = extract_parsed_envelopes(buffer, Compression::None)?;
     Ok(envelopes)
+}
+
+fn extract_unparsed_envelopes(
+    buffer: &[u8],
+    _compression: Compression,
+) -> Result<(usize, Vec<Vec<u8>>)> {
+    let mut current_pos = 0;
+    let mut envelopes = vec![];
+
+    tracing::info!("{:?}", envelopes);
+
+    loop {
+        match Envelope::check_envelope_size(&buffer[current_pos..]) {
+            Ok(envelope_len) => {
+                tracing::info!("pos: {:?} env length: {:?}", current_pos, envelope_len);
+                envelopes.push(Vec::from(&buffer[current_pos..envelope_len]));
+                current_pos += envelope_len;
+            }
+            Err(CheckEnvelopeSizeError::NotEnoughBytes) => break,
+            Err(error) => return Err(error.to_string().into()),
+        }
+    }
+
+    Ok((current_pos, envelopes))
+}
+
+fn try_decode_unparsed_envelopes_with_spare_data(
+    buffer: &mut Vec<u8>,
+    compression: Compression,
+) -> Result<(Vec<Vec<u8>>, Vec<u8>)> {
+    let (current_pos, envelopes) = extract_unparsed_envelopes(buffer.as_slice(), compression)?;
+    Ok((envelopes, buffer.split_off(current_pos)))
+}
+
+fn try_decode_unparsed_envelopes_without_spare_data(buffer: &[u8]) -> Result<Vec<Vec<u8>>> {
+    let (_, envelopes) = extract_unparsed_envelopes(buffer, Compression::None)?;
+    Ok(envelopes)
+}
+
+#[derive(Debug, Clone)]
+pub enum FrameDecoder {
+    LegacyFrameDecoder(LegacyFrameDecoder),
+    Lz4FrameDecoder(Lz4FrameDecoder),
+    UncompressedFrameDecoder(UncompressedFrameDecoder),
+}
+
+impl FrameDecoder {
+    pub fn create_decoder(version: Version, compression: Compression) -> Self {
+        if version >= Version::V5 {
+            match compression {
+                Compression::Lz4 => Self::Lz4FrameDecoder(Lz4FrameDecoder::default()),
+                // >= v5 supports only lz4 => fall back to uncompressed
+                _ => Self::UncompressedFrameDecoder(UncompressedFrameDecoder::default()),
+            }
+        } else {
+            Self::LegacyFrameDecoder(LegacyFrameDecoder::default())
+        }
+    }
+}
+
+impl FrameDecode for FrameDecoder {
+    fn consume(&mut self, data: &mut Vec<u8>, compression: Compression) -> Result<Vec<Envelope>> {
+        match self {
+            FrameDecoder::LegacyFrameDecoder(f) => f.consume(data, compression),
+            FrameDecoder::Lz4FrameDecoder(f) => f.consume(data, compression),
+            FrameDecoder::UncompressedFrameDecoder(f) => f.consume(data, compression),
+        }
+    }
+
+    fn consume_payload(
+        &mut self,
+        data: &mut Vec<u8>,
+        compression: Compression,
+    ) -> Result<Vec<Vec<u8>>> {
+        match self {
+            FrameDecoder::LegacyFrameDecoder(f) => f.consume_payload(data, compression),
+            FrameDecoder::Lz4FrameDecoder(f) => f.consume_payload(data, compression),
+            FrameDecoder::UncompressedFrameDecoder(f) => f.consume_payload(data, compression),
+        }
+    }
 }
 
 /// A decoder for frames. Since protocol v5, frames became "envelopes" and a frame now can contain
 /// multiple complete envelopes (self-contained frame) or a part of one bigger envelope.
-pub trait FrameDecoder {
+pub trait FrameDecode {
     /// Consumes some data and returns decoded envelopes. Decoders can be stateful, so data can be
     /// buffered until envelopes can be parsed.
     /// The buffer passed in should be cleared of consumed data by the decoder.
     fn consume(&mut self, data: &mut Vec<u8>, compression: Compression) -> Result<Vec<Envelope>>;
+
+    /// Consumes some data and returns a vec of envelope bytes
+    fn consume_payload(
+        &mut self,
+        data: &mut Vec<u8>,
+        compression: Compression,
+    ) -> Result<Vec<Vec<u8>>>;
 }
 
 /// Pre-V5 frame decoder which simply decodes one envelope directly into a buffer.
@@ -87,11 +178,12 @@ impl Default for LegacyFrameDecoder {
     }
 }
 
-impl FrameDecoder for LegacyFrameDecoder {
+impl FrameDecode for LegacyFrameDecoder {
     fn consume(&mut self, data: &mut Vec<u8>, compression: Compression) -> Result<Vec<Envelope>> {
         if self.buffer.is_empty() {
             // optimistic case
-            let (envelopes, buffer) = try_decode_envelopes_with_spare_data(data, compression)?;
+            let (envelopes, buffer) =
+                try_decode_parsed_envelopes_with_spare_data(data, compression)?;
 
             self.buffer = buffer;
             data.clear();
@@ -102,7 +194,34 @@ impl FrameDecoder for LegacyFrameDecoder {
         self.buffer.append(data);
 
         let (envelopes, buffer) =
-            try_decode_envelopes_with_spare_data(&mut self.buffer, compression)?;
+            try_decode_parsed_envelopes_with_spare_data(&mut self.buffer, compression)?;
+
+        self.buffer = buffer;
+        Ok(envelopes)
+    }
+
+    fn consume_payload(
+        &mut self,
+        data: &mut Vec<u8>,
+        compression: Compression,
+    ) -> Result<Vec<Vec<u8>>> {
+        tracing::info!("consume_payload: data {:x?}", data);
+
+        if self.buffer.is_empty() {
+            // optimistic case
+            let (envelopes, buffer) =
+                try_decode_unparsed_envelopes_with_spare_data(data, compression)?;
+
+            self.buffer = buffer;
+            data.clear();
+
+            return Ok(envelopes);
+        }
+
+        self.buffer.append(data);
+
+        let (envelopes, buffer) =
+            try_decode_unparsed_envelopes_with_spare_data(&mut self.buffer, compression)?;
 
         self.buffer = buffer;
         Ok(envelopes)
@@ -115,11 +234,20 @@ pub struct Lz4FrameDecoder {
     inner_decoder: GenericFrameDecoder,
 }
 
-impl FrameDecoder for Lz4FrameDecoder {
+impl FrameDecode for Lz4FrameDecoder {
     //noinspection DuplicatedCode
     #[inline]
     fn consume(&mut self, data: &mut Vec<u8>, _compression: Compression) -> Result<Vec<Envelope>> {
         self.inner_decoder.consume(data, Self::try_decode_frame)
+    }
+
+    fn consume_payload(
+        &mut self,
+        data: &mut Vec<u8>,
+        _compression: Compression,
+    ) -> Result<Vec<Vec<u8>>> {
+        self.inner_decoder
+            .consume_payload(data, Self::try_decode_frame)
     }
 }
 
@@ -194,11 +322,20 @@ pub struct UncompressedFrameDecoder {
     inner_decoder: GenericFrameDecoder,
 }
 
-impl FrameDecoder for UncompressedFrameDecoder {
+impl FrameDecode for UncompressedFrameDecoder {
     //noinspection DuplicatedCode
     #[inline]
     fn consume(&mut self, data: &mut Vec<u8>, _compression: Compression) -> Result<Vec<Envelope>> {
         self.inner_decoder.consume(data, Self::try_decode_frame)
+    }
+
+    fn consume_payload(
+        &mut self,
+        data: &mut Vec<u8>,
+        _compression: Compression,
+    ) -> Result<Vec<Vec<u8>>> {
+        self.inner_decoder
+            .consume_payload(data, Self::try_decode_frame)
     }
 }
 
@@ -272,13 +409,13 @@ impl Default for GenericFrameDecoder {
 }
 
 impl GenericFrameDecoder {
-    fn extract_non_self_contained_envelopes(&mut self) -> Result<Vec<Envelope>> {
+    fn extract_non_self_contained_parsed_envelopes(&mut self) -> Result<Vec<Envelope>> {
         if let Some(expected_payload_len) = self.expected_payload_len {
             if self.payload_buffer.len() < expected_payload_len {
                 return Ok(vec![]);
             }
 
-            let envelopes = try_decode_envelopes_without_spare_data(&self.payload_buffer)?;
+            let envelopes = try_decode_parsed_envelopes_without_spare_data(&self.payload_buffer)?;
 
             self.payload_buffer.clear();
             return Ok(envelopes);
@@ -286,7 +423,27 @@ impl GenericFrameDecoder {
 
         if let Some(expected_payload_len) = self.extract_expected_payload_len() {
             self.expected_payload_len = Some(expected_payload_len);
-            self.extract_non_self_contained_envelopes()
+            self.extract_non_self_contained_parsed_envelopes()
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn extract_non_self_contained_unparsed_envelopes(&mut self) -> Result<Vec<Vec<u8>>> {
+        if let Some(expected_payload_len) = self.expected_payload_len {
+            if self.payload_buffer.len() < expected_payload_len {
+                return Ok(vec![]);
+            }
+
+            let envelopes = try_decode_unparsed_envelopes_without_spare_data(&self.payload_buffer)?;
+
+            self.payload_buffer.clear();
+            return Ok(envelopes);
+        }
+
+        if let Some(expected_payload_len) = self.extract_expected_payload_len() {
+            self.expected_payload_len = Some(expected_payload_len);
+            self.extract_non_self_contained_unparsed_envelopes()
         } else {
             Ok(vec![])
         }
@@ -300,7 +457,7 @@ impl GenericFrameDecoder {
         Some(i32::from_be_bytes(self.payload_buffer[5..9].try_into().unwrap()) as usize)
     }
 
-    fn handle_frame(
+    fn handle_frame_parsed_envelopes(
         &mut self,
         envelopes: &mut Vec<Envelope>,
         self_contained: bool,
@@ -311,10 +468,32 @@ impl GenericFrameDecoder {
                 return Err(create_unexpected_self_contained_error());
             }
 
-            envelopes.append(&mut try_decode_envelopes_without_spare_data(frame)?);
+            envelopes.append(&mut try_decode_parsed_envelopes_without_spare_data(frame)?);
         } else {
             self.payload_buffer.append(frame);
-            envelopes.append(&mut self.extract_non_self_contained_envelopes()?);
+            envelopes.append(&mut self.extract_non_self_contained_parsed_envelopes()?);
+        }
+
+        Ok(())
+    }
+
+    fn handle_frame_unparsed_envelopes(
+        &mut self,
+        envelopes: &mut Vec<Vec<u8>>,
+        self_contained: bool,
+        frame: &mut Vec<u8>,
+    ) -> Result<()> {
+        if self_contained {
+            if !self.payload_buffer.is_empty() {
+                return Err(create_unexpected_self_contained_error());
+            }
+
+            envelopes.append(&mut try_decode_unparsed_envelopes_without_spare_data(
+                frame,
+            )?);
+        } else {
+            self.payload_buffer.append(frame);
+            envelopes.append(&mut self.extract_non_self_contained_unparsed_envelopes()?);
         }
 
         Ok(())
@@ -331,7 +510,7 @@ impl GenericFrameDecoder {
             // optimistic case
             while !data.is_empty() {
                 if let Some((self_contained, mut frame)) = try_decode_frame(data)? {
-                    self.handle_frame(&mut envelopes, self_contained, &mut frame)?;
+                    self.handle_frame_parsed_envelopes(&mut envelopes, self_contained, &mut frame)?;
                 } else {
                     // we have some data, but not a full frame yet
                     self.frame_buffer.append(data);
@@ -344,7 +523,49 @@ impl GenericFrameDecoder {
             while !self.frame_buffer.is_empty() {
                 if let Some((self_contained, mut frame)) = try_decode_frame(&mut self.frame_buffer)?
                 {
-                    self.handle_frame(&mut envelopes, self_contained, &mut frame)?;
+                    self.handle_frame_parsed_envelopes(&mut envelopes, self_contained, &mut frame)?;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        Ok(envelopes)
+    }
+
+    fn consume_payload(
+        &mut self,
+        data: &mut Vec<u8>,
+        try_decode_frame: impl Fn(&mut Vec<u8>) -> Result<Option<(bool, Vec<u8>)>>,
+    ) -> Result<Vec<Vec<u8>>> {
+        let mut envelopes = vec![];
+
+        if self.frame_buffer.is_empty() {
+            // optimistic case
+            while !data.is_empty() {
+                if let Some((self_contained, mut frame)) = try_decode_frame(data)? {
+                    self.handle_frame_unparsed_envelopes(
+                        &mut envelopes,
+                        self_contained,
+                        &mut frame,
+                    )?;
+                } else {
+                    // we have some data, but not a full frame yet
+                    self.frame_buffer.append(data);
+                    break;
+                }
+            }
+        } else {
+            self.frame_buffer.append(data);
+
+            while !self.frame_buffer.is_empty() {
+                if let Some((self_contained, mut frame)) = try_decode_frame(&mut self.frame_buffer)?
+                {
+                    self.handle_frame_unparsed_envelopes(
+                        &mut envelopes,
+                        self_contained,
+                        &mut frame,
+                    )?;
                 } else {
                     break;
                 }

@@ -1,10 +1,9 @@
-use derive_more::Constructor;
-use std::io::Cursor;
-
+use crate::envelope::{Direction, Envelope, Flags, FromCursor, Opcode, Serialize, Version};
 use crate::error;
-use crate::frame::{Direction, Envelope, Flags, FromCursor, Opcode, Serialize, Version};
 use crate::query::QueryParams;
 use crate::types::CBytesShort;
+use derive_more::Constructor;
+use std::io::Cursor;
 
 /// The structure that represents a body of a envelope of type `execute`.
 #[derive(Debug, Constructor, Eq, PartialEq)]
@@ -110,9 +109,9 @@ mod tests {
     use std::io::Cursor;
 
     use crate::consistency::Consistency;
-    use crate::frame::message_execute::BodyReqExecuteOwned;
-    use crate::frame::traits::Serialize;
-    use crate::frame::{FromCursor, Version};
+    use crate::envelope::message_execute::BodyReqExecuteOwned;
+    use crate::envelope::traits::Serialize;
+    use crate::envelope::{FromCursor, Version};
     use crate::query::QueryParams;
     use crate::types::CBytesShort;
 

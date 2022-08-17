@@ -1,31 +1,3 @@
-use arc_swap::ArcSwapOption;
-use cassandra_protocol::compression::Compression;
-use cassandra_protocol::consistency::Consistency;
-use cassandra_protocol::error;
-use cassandra_protocol::events::ServerEvent;
-use cassandra_protocol::frame::message_response::ResponseBody;
-use cassandra_protocol::frame::message_result::{BodyResResultPrepared, TableSpec};
-use cassandra_protocol::frame::{Envelope, Flags, Serialize, Version};
-use cassandra_protocol::query::{PreparedQuery, Query, QueryBatch, QueryValues};
-use cassandra_protocol::token::Murmur3Token;
-use cassandra_protocol::types::value::Value;
-use cassandra_protocol::types::{CIntShort, SHORT_LEN};
-use futures::stream::FuturesUnordered;
-use futures::{FutureExt, StreamExt};
-use itertools::Itertools;
-use lazy_static::lazy_static;
-use std::io::{Cursor, Write};
-use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
-use thiserror::Error;
-use tokio::sync::broadcast::{channel, Receiver, Sender};
-use tokio::sync::watch;
-use tokio::task::JoinHandle;
-use tokio::time::sleep;
-use tokio::{pin, select};
-use tracing::*;
-
 use crate::cluster::connection_manager::ConnectionManager;
 use crate::cluster::connection_pool::{ConnectionPoolConfig, ConnectionPoolFactory};
 use crate::cluster::control_connection::ControlConnection;
@@ -53,6 +25,33 @@ use crate::statement::{StatementParams, StatementParamsBuilder};
 #[cfg(feature = "rust-tls")]
 use crate::transport::TransportRustls;
 use crate::transport::{CdrsTransport, TransportTcp};
+use arc_swap::ArcSwapOption;
+use cassandra_protocol::compression::Compression;
+use cassandra_protocol::consistency::Consistency;
+use cassandra_protocol::envelope::message_response::ResponseBody;
+use cassandra_protocol::envelope::message_result::{BodyResResultPrepared, TableSpec};
+use cassandra_protocol::envelope::{Envelope, Flags, Serialize, Version};
+use cassandra_protocol::error;
+use cassandra_protocol::events::ServerEvent;
+use cassandra_protocol::query::{PreparedQuery, Query, QueryBatch, QueryValues};
+use cassandra_protocol::token::Murmur3Token;
+use cassandra_protocol::types::value::Value;
+use cassandra_protocol::types::{CIntShort, SHORT_LEN};
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, StreamExt};
+use itertools::Itertools;
+use lazy_static::lazy_static;
+use std::io::{Cursor, Write};
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
+use thiserror::Error;
+use tokio::sync::broadcast::{channel, Receiver, Sender};
+use tokio::sync::watch;
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
+use tokio::{pin, select};
+use tracing::*;
 
 pub const DEFAULT_TRANSPORT_BUFFER_SIZE: usize = 1024;
 const DEFAULT_EVENT_CHANNEL_CAPACITY: usize = 128;
@@ -1308,7 +1307,7 @@ impl<
 #[cfg(test)]
 mod tests {
     use crate::cluster::session::prepare_flags;
-    use cassandra_protocol::frame::Flags;
+    use cassandra_protocol::envelope::Flags;
 
     #[test]
     fn prepare_flags_test() {

@@ -1,11 +1,10 @@
-use cassandra_protocol::error;
-use cassandra_protocol::frame::Envelope;
-use std::sync::Arc;
-
 use crate::cluster::topology::Node;
 use crate::cluster::ConnectionManager;
 use crate::retry::{QueryInfo, RetryDecision, RetrySession};
 use crate::transport::CdrsTransport;
+use cassandra_protocol::envelope::Envelope;
+use cassandra_protocol::error;
+use std::sync::Arc;
 
 /// Mid-level interface for sending envelopes to the cluster. Uses a query plan to route envelope to
 /// appropriate node, and retry policy for error handling. Returns `None` if no nodes were present

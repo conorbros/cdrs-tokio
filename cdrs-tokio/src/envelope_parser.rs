@@ -1,18 +1,17 @@
-use std::convert::TryFrom;
-use std::io::Cursor;
-use std::net::SocketAddr;
-use tokio::io::AsyncReadExt;
-
 use cassandra_protocol::compression::Compression;
-use cassandra_protocol::error;
-use cassandra_protocol::frame::message_response::ResponseBody;
-use cassandra_protocol::frame::{
+use cassandra_protocol::envelope::message_response::ResponseBody;
+use cassandra_protocol::envelope::{
     Direction, Envelope, Flags, Opcode, Version, LENGTH_LEN, STREAM_LEN,
 };
+use cassandra_protocol::error;
 use cassandra_protocol::types::data_serialization_types::decode_timeuuid;
 use cassandra_protocol::types::{
     from_cursor_string_list, try_i16_from_bytes, try_i32_from_bytes, UUID_LEN,
 };
+use std::convert::TryFrom;
+use std::io::Cursor;
+use std::net::SocketAddr;
+use tokio::io::AsyncReadExt;
 
 async fn parse_raw_envelope<T: AsyncReadExt + Unpin>(
     cursor: &mut T,

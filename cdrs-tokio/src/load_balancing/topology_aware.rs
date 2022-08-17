@@ -294,15 +294,6 @@ impl<T: CdrsTransport, CM: ConnectionManager<T>> TopologyAwareLoadBalancingStrat
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use cassandra_protocol::frame::Version;
-    use cassandra_protocol::token::Murmur3Token;
-    use fxhash::FxHashMap;
-    use lazy_static::lazy_static;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::sync::Arc;
-    use tokio::sync::watch;
-    use uuid::Uuid;
-
     use crate::cluster::connection_manager::MockConnectionManager;
     use crate::cluster::connection_pool::ConnectionPoolFactory;
     use crate::cluster::topology::{
@@ -313,6 +304,14 @@ mod tests {
         LoadBalancingStrategy, Request, TopologyAwareLoadBalancingStrategy,
     };
     use crate::transport::MockCdrsTransport;
+    use cassandra_protocol::envelope::Version;
+    use cassandra_protocol::token::Murmur3Token;
+    use fxhash::FxHashMap;
+    use lazy_static::lazy_static;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
+    use tokio::sync::watch;
+    use uuid::Uuid;
 
     lazy_static! {
         static ref HOST_ID_1: Uuid = Uuid::new_v4();

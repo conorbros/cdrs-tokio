@@ -1,14 +1,13 @@
-use std::collections::HashMap;
-use std::io::Cursor;
-
 use crate::consistency::Consistency;
-use crate::frame::traits::FromCursor;
-use crate::frame::{Serialize, Version};
+use crate::envelope::traits::FromCursor;
+use crate::envelope::{Serialize, Version};
 use crate::query::query_flags::QueryFlags;
 use crate::query::query_values::QueryValues;
 use crate::types::{from_cursor_str, serialize_str, value::Value, CInt, CIntShort};
 use crate::types::{CBytes, CLong};
 use crate::Error;
+use std::collections::HashMap;
+use std::io::Cursor;
 
 /// Parameters of Query for query operation.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

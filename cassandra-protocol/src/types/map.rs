@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use time::PrimitiveDateTime;
 use uuid::Uuid;
-
 use crate::error::{Error, Result};
-use crate::frame::message_result::{ColType, ColTypeOption, ColTypeOptionValue};
-use crate::frame::Version;
+use crate::envelope::message_result::{ColType, ColTypeOption, ColTypeOptionValue};
+use crate::envelope::Version;
 use crate::types::blob::Blob;
 use crate::types::data_serialization_types::*;
 use crate::types::decimal::Decimal;

@@ -1,15 +1,13 @@
+use self::cassandra_type::CassandraType;
+use crate::envelope::traits::FromCursor;
+use crate::envelope::{Serialize, Version};
+use crate::error::{column_is_empty_err, Error as CdrsError, Result as CDRSResult};
+use crate::types::data_serialization_types::*;
 use derive_more::Constructor;
 use std::convert::TryInto;
 use std::io::{self, Write};
 use std::io::{Cursor, Read};
 use std::net::{IpAddr, SocketAddr};
-
-use crate::error::{column_is_empty_err, Error as CdrsError, Result as CDRSResult};
-use crate::frame::traits::FromCursor;
-use crate::frame::{Serialize, Version};
-use crate::types::data_serialization_types::*;
-
-use self::cassandra_type::CassandraType;
 
 pub const SHORT_LEN: usize = 2;
 pub const INT_LEN: usize = 4;
@@ -34,8 +32,8 @@ pub mod udt;
 pub mod value;
 
 pub mod prelude {
+    pub use crate::envelope::{TryFromRow, TryFromUdt};
     pub use crate::error::{Error, Result};
-    pub use crate::frame::{TryFromRow, TryFromUdt};
     pub use crate::types::blob::Blob;
     pub use crate::types::decimal::Decimal;
     pub use crate::types::duration::Duration;
@@ -507,7 +505,7 @@ pub fn cursor_next_value_ref<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frame::traits::FromCursor;
+    use crate::envelope::traits::FromCursor;
     use num::BigInt;
     use std::io::Cursor;
 

@@ -1,6 +1,10 @@
+use crate::cluster::connection_pool::{ConnectionPool, ConnectionPoolFactory};
+use crate::cluster::topology::{NodeDistance, NodeState};
+use crate::cluster::{ConnectionManager, NodeInfo};
+use crate::transport::CdrsTransport;
 use atomic::Atomic;
+use cassandra_protocol::envelope::Envelope;
 use cassandra_protocol::error::{Error, Result};
-use cassandra_protocol::frame::Envelope;
 use cassandra_protocol::token::Murmur3Token;
 use std::fmt::{Debug, Formatter};
 use std::net::SocketAddr;
@@ -10,11 +14,6 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::OnceCell;
 use tracing::*;
 use uuid::Uuid;
-
-use crate::cluster::connection_pool::{ConnectionPool, ConnectionPoolFactory};
-use crate::cluster::topology::{NodeDistance, NodeState};
-use crate::cluster::{ConnectionManager, NodeInfo};
-use crate::transport::CdrsTransport;
 
 /// Metadata about a Cassandra node in the cluster, along with a connection.
 pub struct Node<T: CdrsTransport + 'static, CM: ConnectionManager<T> + 'static> {

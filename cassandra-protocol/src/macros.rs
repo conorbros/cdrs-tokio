@@ -836,7 +836,7 @@ macro_rules! as_rust_type {
             ColType::Blob => as_res_opt!($data_value, decode_blob),
             ColType::Custom => {
                 let unmarshal = || {
-                    if let Some(crate::frame::message_result::ColTypeOptionValue::CString(value)) = &$data_type_option.value {
+                    if let Some(crate::envelope::message_result::ColTypeOptionValue::CString(value)) = &$data_type_option.value {
                         if value.as_str() == "org.apache.cassandra.db.marshal.BytesType" {
                             return as_res_opt!($data_value, decode_blob);
                         }
@@ -941,7 +941,7 @@ macro_rules! as_rust_type {
             ColType::Date => as_res_opt!($data_value, decode_date),
             ColType::Custom => {
                 let unmarshal = || {
-                    if let Some(crate::frame::message_result::ColTypeOptionValue::CString(value)) = &$data_type_option.value {
+                    if let Some(crate::envelope::message_result::ColTypeOptionValue::CString(value)) = &$data_type_option.value {
                         match value.as_str() {
                             "org.apache.cassandra.db.marshal.Int32Type" => return as_res_opt!($data_value, decode_int),
                             "org.apache.cassandra.db.marshal.SimpleDateType" => return as_res_opt!($data_value, decode_date),

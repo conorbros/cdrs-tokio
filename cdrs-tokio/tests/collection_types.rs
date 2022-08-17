@@ -1,7 +1,7 @@
 mod common;
 
 #[cfg(feature = "e2e-tests")]
-use cassandra_protocol::frame::Version;
+use cassandra_protocol::envelope::Version;
 #[cfg(feature = "e2e-tests")]
 use cdrs_tokio::query_values;
 #[cfg(feature = "e2e-tests")]

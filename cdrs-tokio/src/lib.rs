@@ -56,8 +56,8 @@ pub mod transport;
 pub use cassandra_protocol::authenticators;
 pub use cassandra_protocol::compression;
 pub use cassandra_protocol::consistency;
+pub use cassandra_protocol::envelope;
 pub use cassandra_protocol::error;
-pub use cassandra_protocol::frame;
 pub use cassandra_protocol::query;
 pub use cassandra_protocol::types;
 

@@ -1,15 +1,14 @@
-use std::io::Cursor;
-
-use crate::frame::message_auth_response::BodyReqAuthResponse;
-use crate::frame::message_batch::BodyReqBatch;
-use crate::frame::message_execute::BodyReqExecuteOwned;
-use crate::frame::message_options::BodyReqOptions;
-use crate::frame::message_prepare::BodyReqPrepare;
-use crate::frame::message_query::BodyReqQuery;
-use crate::frame::message_register::BodyReqRegister;
-use crate::frame::message_startup::BodyReqStartup;
-use crate::frame::{FromCursor, Opcode, Serialize, Version};
+use crate::envelope::message_auth_response::BodyReqAuthResponse;
+use crate::envelope::message_batch::BodyReqBatch;
+use crate::envelope::message_execute::BodyReqExecuteOwned;
+use crate::envelope::message_options::BodyReqOptions;
+use crate::envelope::message_prepare::BodyReqPrepare;
+use crate::envelope::message_query::BodyReqQuery;
+use crate::envelope::message_register::BodyReqRegister;
+use crate::envelope::message_startup::BodyReqStartup;
+use crate::envelope::{FromCursor, Opcode, Serialize, Version};
 use crate::{error, Error};
+use std::io::Cursor;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(clippy::large_enum_variant)]

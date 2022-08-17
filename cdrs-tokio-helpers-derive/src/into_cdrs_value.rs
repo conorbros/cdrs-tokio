@@ -16,17 +16,17 @@ pub fn impl_into_cdrs_value(ast: &DeriveInput) -> TokenStream {
                   match value.#field_ident {
                     Some(ref val) => {
                       let field_bytes: Self = val.clone().into();
-                      cdrs_tokio::types::value::Value::new(field_bytes).serialize(&mut cursor, cdrs_tokio::frame::Version::V4);
+                      cdrs_tokio::types::value::Value::new(field_bytes).serialize(&mut cursor, cdrs_tokio::envelope::Version::V4);
                     },
                     None => {
-                      cdrs_tokio::types::value::Value::NotSet.serialize(&mut cursor, cdrs_tokio::frame::Version::V4);
+                      cdrs_tokio::types::value::Value::NotSet.serialize(&mut cursor, cdrs_tokio::envelope::Version::V4);
                     }
                   }
                 }
             } else {
                 quote! {
                   let field_bytes: Self = value.#field_ident.into();
-                  cdrs_tokio::types::value::Value::new(field_bytes).serialize(&mut cursor, cdrs_tokio::frame::Version::V4);
+                  cdrs_tokio::types::value::Value::new(field_bytes).serialize(&mut cursor, cdrs_tokio::envelope::Version::V4);
                 }
             }
         });
@@ -37,7 +37,7 @@ pub fn impl_into_cdrs_value(ast: &DeriveInput) -> TokenStream {
             impl From<#name> for cdrs_tokio::types::value::Bytes {
               fn from(value: #name) -> Self {
                 #[allow(unused_imports)]
-                use cdrs_tokio::frame::Serialize;
+                use cdrs_tokio::envelope::Serialize;
 
                 let mut bytes: Vec<u8> = Vec::new();
                 let mut cursor = std::io::Cursor::new(&mut bytes);

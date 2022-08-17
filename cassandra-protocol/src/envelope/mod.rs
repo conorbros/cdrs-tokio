@@ -1,3 +1,10 @@
+use crate::compression::{Compression, CompressionError};
+use crate::envelope::message_request::RequestBody;
+use crate::envelope::message_response::ResponseBody;
+pub use crate::envelope::traits::*;
+//use crate::frame::{decoder, encoder};
+use crate::types::data_serialization_types::decode_timeuuid;
+use crate::types::{from_cursor_string_list, try_i16_from_bytes, try_i32_from_bytes, UUID_LEN};
 use bitflags::bitflags;
 use derivative::Derivative;
 use derive_more::{Constructor, Display};
@@ -6,24 +13,14 @@ use std::io::Cursor;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::compression::{Compression, CompressionError};
-use crate::frame::message_request::RequestBody;
-use crate::frame::message_response::ResponseBody;
-use crate::types::data_serialization_types::decode_timeuuid;
-use crate::types::{from_cursor_string_list, try_i16_from_bytes, try_i32_from_bytes, UUID_LEN};
-
-pub use crate::frame::traits::*;
-
 /// Number of bytes in the header
-const ENVELOPE_HEADER_LEN: usize = 9;
+pub const ENVELOPE_HEADER_LEN: usize = 9;
 /// Number of stream bytes in accordance to protocol.
 pub const STREAM_LEN: usize = 2;
 /// Number of body length bytes in accordance to protocol.
 pub const LENGTH_LEN: usize = 4;
 
 pub mod events;
-pub mod frame_decoder;
-pub mod frame_encoder;
 pub mod message_auth_challenge;
 pub mod message_auth_response;
 pub mod message_auth_success;
@@ -59,9 +56,9 @@ const fn const_max(a: usize, b: usize) -> usize {
 /// Maximum size of frame payloads - aggregated envelopes or a part of a single envelope.
 pub const PAYLOAD_SIZE_LIMIT: usize = 1 << 17;
 
-pub(self) const UNCOMPRESSED_FRAME_HEADER_LENGTH: usize = 6;
-pub(self) const COMPRESSED_FRAME_HEADER_LENGTH: usize = 8;
-pub(self) const FRAME_TRAILER_LENGTH: usize = 4;
+pub const UNCOMPRESSED_FRAME_HEADER_LENGTH: usize = 6;
+pub const COMPRESSED_FRAME_HEADER_LENGTH: usize = 8;
+pub const FRAME_TRAILER_LENGTH: usize = 4;
 
 /// Maximum size of an entire frame.
 pub const MAX_FRAME_SIZE: usize = PAYLOAD_SIZE_LIMIT
@@ -465,13 +462,13 @@ impl TryFrom<u8> for Opcode {
 mod tests {
     use super::*;
     use crate::consistency::Consistency;
-    use crate::frame::frame_decoder::{
-        FrameDecoder, LegacyFrameDecoder, Lz4FrameDecoder, UncompressedFrameDecoder,
+    use crate::envelope::message_query::BodyReqQuery;
+    use crate::frame::decoder::{
+        FrameDecode, LegacyFrameDecoder, Lz4FrameDecoder, UncompressedFrameDecoder,
     };
-    use crate::frame::frame_encoder::{
-        FrameEncoder, LegacyFrameEncoder, Lz4FrameEncoder, UncompressedFrameEncoder,
+    use crate::frame::encoder::{
+        FrameEncode, LegacyFrameEncoder, Lz4FrameEncoder, UncompressedFrameEncoder,
     };
-    use crate::frame::message_query::BodyReqQuery;
     use crate::query::query_params::QueryParams;
     use crate::query::query_values::QueryValues;
     use crate::types::value::Value;
@@ -749,7 +746,7 @@ mod tests {
 
     #[test]
     fn test_result_prepared_statement() {
-        use crate::frame::message_result::{
+        use crate::envelope::message_result::{
             BodyResResultPrepared, ColSpec, ColType, ColTypeOption, PreparedMetadata,
             ResResultBody, RowsMetadata, RowsMetadataFlags, TableSpec,
         };

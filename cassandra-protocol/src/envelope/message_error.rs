@@ -1,14 +1,13 @@
 /// This modules contains [Cassandra's errors](<https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>)
 /// which server could respond to client.
+use crate::consistency::Consistency;
+use crate::envelope::traits::FromCursor;
+use crate::envelope::Version;
+use crate::types::*;
+use crate::{error, Error};
 use derive_more::Display;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
-
-use crate::consistency::Consistency;
-use crate::frame::traits::FromCursor;
-use crate::frame::Version;
-use crate::types::*;
-use crate::{error, Error};
 
 use super::Serialize;
 

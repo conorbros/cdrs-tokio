@@ -1,9 +1,8 @@
-use std::io::Cursor;
-
+use crate::envelope::events::ServerEvent;
+use crate::envelope::Serialize;
+use crate::envelope::{FromCursor, Version};
 use crate::error;
-use crate::frame::events::ServerEvent;
-use crate::frame::Serialize;
-use crate::frame::{FromCursor, Version};
+use std::io::Cursor;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct BodyResEvent {
@@ -26,8 +25,8 @@ impl FromCursor for BodyResEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frame::events::*;
-    use crate::frame::traits::FromCursor;
+    use crate::envelope::events::*;
+    use crate::envelope::traits::FromCursor;
     use crate::types::CInet;
     use std::io::Cursor;
 

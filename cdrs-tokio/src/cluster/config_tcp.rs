@@ -1,10 +1,9 @@
+use crate::cluster::NodeAddress;
 use cassandra_protocol::authenticators::{NoneAuthenticatorProvider, SaslAuthenticatorProvider};
+use cassandra_protocol::envelope::Version;
 use cassandra_protocol::error::Result;
-use cassandra_protocol::frame::Version;
 use std::net::SocketAddr;
 use std::sync::Arc;
-
-use crate::cluster::NodeAddress;
 
 /// Single node TCP connection config.
 #[derive(Clone)]

@@ -10,17 +10,24 @@
 //! * [`TransportRustls`] is a transport which is used to establish SSL encrypted connection
 //!with Apache Cassandra server. **Note:** this option is available if and only if CDRS is imported
 //!with `rust-tls` feature.
+use crate::cluster::KeyspaceHolder;
+use crate::envelope_parser::{convert_envelope_into_result, parse_envelope};
+use crate::future::BoxFuture;
+use crate::Error;
+use crate::Result;
 use cassandra_protocol::compression::Compression;
-use cassandra_protocol::frame::frame_decoder::FrameDecoder;
-use cassandra_protocol::frame::frame_encoder::FrameEncoder;
-use cassandra_protocol::frame::message_result::ResultKind;
-use cassandra_protocol::frame::{Envelope, StreamId, MAX_FRAME_SIZE};
-use cassandra_protocol::frame::{FromBytes, Opcode, EVENT_STREAM_ID};
+use cassandra_protocol::envelope::message_result::ResultKind;
+use cassandra_protocol::envelope::{Envelope, StreamId, MAX_FRAME_SIZE};
+use cassandra_protocol::envelope::{FromBytes, Opcode, EVENT_STREAM_ID};
+use cassandra_protocol::frame::decoder::FrameDecode;
+use cassandra_protocol::frame::encoder::FrameEncode;
 use cassandra_protocol::types::INT_LEN;
 use derive_more::Constructor;
 use futures::FutureExt;
 use fxhash::FxHashMap;
 use itertools::Itertools;
+#[cfg(test)]
+use mockall::*;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicI16, Ordering};
@@ -35,15 +42,6 @@ use tokio::task::JoinHandle;
 #[cfg(feature = "rust-tls")]
 use tokio_rustls::TlsConnector as RustlsConnector;
 use tracing::*;
-
-#[cfg(test)]
-use mockall::*;
-
-use crate::cluster::KeyspaceHolder;
-use crate::envelope_parser::{convert_envelope_into_result, parse_envelope};
-use crate::future::BoxFuture;
-use crate::Error;
-use crate::Result;
 
 const INITIAL_STREAM_ID: i16 = 1;
 
@@ -95,8 +93,8 @@ impl TransportTcp {
         event_handler: Option<mpsc::Sender<Envelope>>,
         error_handler: Option<mpsc::Sender<Error>>,
         compression: Compression,
-        frame_encoder: Box<dyn FrameEncoder + Send + Sync>,
-        frame_decoder: Box<dyn FrameDecoder + Send + Sync>,
+        frame_encoder: Box<dyn FrameEncode + Send + Sync>,
+        frame_decoder: Box<dyn FrameDecode + Send + Sync>,
         buffer_size: usize,
         tcp_nodelay: bool,
     ) -> io::Result<TransportTcp> {
@@ -160,8 +158,8 @@ impl TransportRustls {
         event_handler: Option<mpsc::Sender<Envelope>>,
         error_handler: Option<mpsc::Sender<Error>>,
         compression: Compression,
-        frame_encoder: Box<dyn FrameEncoder + Send + Sync>,
-        frame_decoder: Box<dyn FrameDecoder + Send + Sync>,
+        frame_encoder: Box<dyn FrameEncode + Send + Sync>,
+        frame_decoder: Box<dyn FrameDecode + Send + Sync>,
         buffer_size: usize,
         tcp_nodelay: bool,
     ) -> io::Result<Self> {
@@ -231,8 +229,8 @@ impl AsyncTransport {
     fn new<T: AsyncRead + AsyncWrite + Send + 'static>(
         addr: SocketAddr,
         compression: Compression,
-        frame_encoder: Box<dyn FrameEncoder + Send + Sync>,
-        frame_decoder: Box<dyn FrameDecoder + Send + Sync>,
+        frame_encoder: Box<dyn FrameEncode + Send + Sync>,
+        frame_decoder: Box<dyn FrameDecode + Send + Sync>,
         buffer_size: usize,
         read_half: ReadHalf<T>,
         write_half: WriteHalf<T>,
@@ -283,8 +281,10 @@ impl AsyncTransport {
 
         // handshake messages are never compressed
         let data = if handshake {
+            tracing::info!("handshake");
             envelope.encode_with(Compression::None)?
         } else {
+            tracing::info!("not handshake");
             envelope.encode_with(self.compression)?
         };
 
@@ -309,8 +309,8 @@ impl AsyncTransport {
         is_broken: Arc<AtomicBool>,
         compression: Compression,
         addr: SocketAddr,
-        frame_encoder: Box<dyn FrameEncoder + Send + Sync>,
-        frame_decoder: Box<dyn FrameDecoder + Send + Sync>,
+        frame_encoder: Box<dyn FrameEncode + Send + Sync>,
+        frame_decoder: Box<dyn FrameDecode + Send + Sync>,
     ) {
         let response_handler_map = ResponseHandlerMap::new();
 
@@ -351,7 +351,7 @@ impl AsyncTransport {
         addr: SocketAddr,
         keyspace_holder: Arc<KeyspaceHolder>,
         response_handler_map: &ResponseHandlerMap,
-        frame_decoder: Box<dyn FrameDecoder + Send + Sync>,
+        frame_decoder: Box<dyn FrameDecode + Send + Sync>,
     ) -> Result<()> {
         // before Authenticate or Ready, envelopes are unframed
         loop {
@@ -394,7 +394,7 @@ impl AsyncTransport {
         addr: SocketAddr,
         keyspace_holder: Arc<KeyspaceHolder>,
         response_handler_map: &ResponseHandlerMap,
-        mut frame_decoder: Box<dyn FrameDecoder + Send + Sync>,
+        mut frame_decoder: Box<dyn FrameDecode + Send + Sync>,
     ) -> Result<()> {
         let mut buffer = Vec::with_capacity(MAX_FRAME_SIZE);
         loop {
@@ -437,7 +437,7 @@ impl AsyncTransport {
         mut write_receiver: mpsc::Receiver<Request>,
         mut write_half: impl AsyncWrite + Unpin,
         response_handler_map: &ResponseHandlerMap,
-        mut frame_encoder: Box<dyn FrameEncoder + Send + Sync>,
+        mut frame_encoder: Box<dyn FrameEncode + Send + Sync>,
     ) -> Result<()> {
         let mut frame_stream_ids = Vec::with_capacity(1);
 
@@ -537,7 +537,7 @@ impl AsyncTransport {
         write_half: &mut (impl AsyncWrite + Unpin),
         response_handler_map: &ResponseHandlerMap,
         frame_stream_ids: &mut Vec<StreamId>,
-        frame_encoder: &mut (dyn FrameEncoder + Send + Sync),
+        frame_encoder: &mut (dyn FrameEncode + Send + Sync),
     ) -> Result<()> {
         Self::write_frame(
             write_half,

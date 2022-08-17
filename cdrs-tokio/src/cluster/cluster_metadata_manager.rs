@@ -1,12 +1,19 @@
+use crate::cluster::connection_pool::ConnectionPoolFactory;
+use crate::cluster::metadata_builder::{add_new_node, build_initial_metadata, refresh_metadata};
+use crate::cluster::topology::{KeyspaceMetadata, Node, NodeState, ReplicationStrategy};
+use crate::cluster::{ClusterMetadata, ConnectionManager};
+use crate::cluster::{NodeInfo, SessionContext};
+use crate::load_balancing::node_distance_evaluator::NodeDistanceEvaluator;
+use crate::transport::CdrsTransport;
 use arc_swap::ArcSwap;
-use cassandra_protocol::error::{Error, Result};
-use cassandra_protocol::events::{SchemaChange, ServerEvent};
-use cassandra_protocol::frame::events::{
+use cassandra_protocol::envelope::events::{
     SchemaChangeOptions, SchemaChangeType, StatusChange, StatusChangeType, TopologyChange,
     TopologyChangeType,
 };
-use cassandra_protocol::frame::message_error::{AdditionalErrorInfo, ErrorBody};
-use cassandra_protocol::frame::{Envelope, Flags, Version};
+use cassandra_protocol::envelope::message_error::{AdditionalErrorInfo, ErrorBody};
+use cassandra_protocol::envelope::{Envelope, Flags, Version};
+use cassandra_protocol::error::{Error, Result};
+use cassandra_protocol::events::{SchemaChange, ServerEvent};
 use cassandra_protocol::query::{Query, QueryParams, QueryParamsBuilder, QueryValues};
 use cassandra_protocol::token::Murmur3Token;
 use cassandra_protocol::types::list::List;
@@ -24,14 +31,6 @@ use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Receiver;
 use tracing::*;
-
-use crate::cluster::connection_pool::ConnectionPoolFactory;
-use crate::cluster::metadata_builder::{add_new_node, build_initial_metadata, refresh_metadata};
-use crate::cluster::topology::{KeyspaceMetadata, Node, NodeState, ReplicationStrategy};
-use crate::cluster::{ClusterMetadata, ConnectionManager};
-use crate::cluster::{NodeInfo, SessionContext};
-use crate::load_balancing::node_distance_evaluator::NodeDistanceEvaluator;
-use crate::transport::CdrsTransport;
 
 fn find_in_peers(
     peers: &[Row],

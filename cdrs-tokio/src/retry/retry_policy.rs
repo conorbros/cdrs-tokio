@@ -1,9 +1,8 @@
-use derive_more::Display;
-
-use cassandra_protocol::error::Error;
-use cassandra_protocol::frame::message_error::{
+use cassandra_protocol::envelope::message_error::{
     AdditionalErrorInfo, ErrorBody, ReadTimeoutError, WriteTimeoutError, WriteType,
 };
+use cassandra_protocol::error::Error;
+use derive_more::Display;
 
 #[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Copy, Clone, Display)]
 pub enum RetryDecision {
